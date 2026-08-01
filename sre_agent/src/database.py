@@ -1,0 +1,77 @@
+import os
+import sys
+import uuid
+import asyncio
+import psycopg_pool
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from src.llm_factory import get_embeddings
+
+def get_db_uri():
+    db_url = os.getenv("COCKROACH_DATABASE_URL")
+    if not db_url:
+        print("OPERATIONAL ERROR: COCKROACH_DATABASE_URL environment variable is missing.")
+        print("Please configure it (e.g. in your .env file) before running the agent.")
+        raise RuntimeError("COCKROACH_DATABASE_URL environment variable is missing.")
+    return db_url
+
+async def init_db():
+    db_uri = get_db_uri()
+    print("Initializing CockroachDB tables...")
+
+    try:
+        async with psycopg_pool.AsyncConnectionPool(db_uri) as pool:
+            async with pool.connection() as conn:
+                async with conn.cursor() as cur:
+
+                    # Note: pgvector extension must be created by a database superuser out-of-band:
+                    # CREATE EXTENSION IF NOT EXISTS vector;
+
+                    # Create incident_memory table
+                    await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS incident_memory (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        alert_type TEXT,
+                        error_log TEXT,
+                        resolution_steps TEXT,
+                        embedding VECTOR(768)
+                    );
+                    """)
+
+                    # Check if we need to seed
+                    await cur.execute("SELECT COUNT(*) FROM incident_memory;")
+                    count_row = await cur.fetchone()
+                    count = count_row[0] if count_row else 0
+
+                    if count == 0:
+                        print("Seeding incident_memory with mock historical incidents...")
+
+                        from src.llm_factory import aget_active_llm
+                        await aget_active_llm()
+
+                        embedder = get_embeddings()
+
+                        incidents = [
+                            (str(uuid.uuid4()), "Thermal Runaway", "ESP32 thermal sensor reports temperature exceeding 85C for 60 seconds.", "Triggered active cooling fans and throttled CPU clock to 80MHz.", await embedder.aembed_query("ESP32 thermal sensor reports temperature exceeding 85C for 60 seconds.")),
+                            (str(uuid.uuid4()), "Sensor Disconnect", "I2C bus error: timeout reading from BMP280 pressure sensor.", "Reset I2C bus via hardware pin and re-initialized BMP280 driver.", await embedder.aembed_query("I2C bus error: timeout reading from BMP280 pressure sensor.")),
+                            (str(uuid.uuid4()), "Voltage Drop", "VCC rail dipped below 2.9V, risk of brownout.", "Disabled non-essential peripherals and enabled deep sleep mode.", await embedder.aembed_query("VCC rail dipped below 2.9V, risk of brownout."))
+                        ]
+
+                        await cur.executemany(
+                            "INSERT INTO incident_memory (id, alert_type, error_log, resolution_steps, embedding) VALUES (%s::uuid, %s, %s, %s, %s::vector)",
+                            incidents
+                        )
+                        print("Seeding completed successfully.")
+                    else:
+                        print(f"incident_memory table already contains {count} records. Skipping seed.")
+
+                await conn.commit()
+                print("Database initialization complete.")
+    except Exception as e:
+        print(f"CRITICAL ERROR during database initialization: {e}")
+        raise RuntimeError(f"Database initialization failed: {e}") from e
+
+if __name__ == "__main__":
+    asyncio.run(init_db())
