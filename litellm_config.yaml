@@ -4,7 +4,7 @@ model_list:
   # ==========================================
   - model_name: sre-fast-tier
     litellm_params:
-      model: gemini/gemma-4-31b
+      model: gemini/gemini-3-flash
       api_key: os.environ/GEMINI_API_KEY
       rpm: 30
       tpm: 16000
@@ -38,7 +38,7 @@ model_list:
       tpm: 250000
   - model_name: sre-complex-tier
     litellm_params:
-      model: gemini/gemini-3-flash
+      model: gemini/gemma-4-31b-it
       api_key: os.environ/GEMINI_API_KEY
       rpm: 5
       tpm: 250000

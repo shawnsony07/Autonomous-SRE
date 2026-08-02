@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import psycopg_pool
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.checkpoint.memory import MemorySaver
 
 from src.database import init_db, get_db_uri
 from src.graph import build_graph, AgentState
@@ -66,9 +66,8 @@ async def init_global_graph():
         _global_pool = psycopg_pool.AsyncConnectionPool(db_uri, open=False)
         await _global_pool.open()
         
-        # CRITICAL FIX: Use the official Postgres checkpointer
-        checkpointer = AsyncPostgresSaver(_global_pool)
-        await checkpointer.setup()
+        # Switched to MemorySaver to bypass the CockroachDB jsonb_each_text error
+        checkpointer = MemorySaver()
         _compiled_graph = graph_builder.compile(checkpointer=checkpointer, interrupt_before=["Execute_Skill"])
 
         return _compiled_graph
