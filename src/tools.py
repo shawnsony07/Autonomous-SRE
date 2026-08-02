@@ -1,10 +1,18 @@
 import os
 import asyncio
-from mcp.client.sse import sse_client
 from mcp.client.session import ClientSession
 import paho.mqtt.client as mqtt
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+# Dynamically import HTTP client across MCP SDK versions
+try:
+    from mcp.client.http import http_client  # type: ignore
+except ImportError:
+    try:
+        from mcp.client.streamable_http import streamablehttp_client as http_client  # type: ignore
+    except ImportError:
+        from mcp.client.streamable_http import streamable_http_client as http_client
 
 COCKROACH_MCP_URL = os.environ.get("COCKROACH_MCP_URL", "https://mock-mcp-server.cockroachlabs.cloud/sse")
 COCKROACH_MCP_API_KEY = os.environ.get("COCKROACH_MCP_API_KEY", "")
@@ -35,7 +43,7 @@ def get_mqtt_publisher() -> mqtt.Client:
     global _mqtt_publisher
     with _mqtt_lock:
         if _mqtt_publisher is None:
-            _mqtt_publisher = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+            _mqtt_publisher = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)  # type: ignore
             _mqtt_publisher.connect("localhost", 1883, 60)
             _mqtt_publisher.loop_start()
         return _mqtt_publisher
@@ -73,18 +81,32 @@ async def publish_edge_command(command: str) -> str:
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type((ConnectionError, asyncio.TimeoutError, httpx.RequestError)))
 async def _execute_mcp_call(tool_name: str, safe_args: dict, headers: dict) -> str:
-    async with sse_client(url=COCKROACH_MCP_URL, headers=headers) as streams:
-        read_stream, write_stream = streams
-        async with ClientSession(read_stream, write_stream) as session:
-            await session.initialize()
-
-            result = await session.call_tool(tool_name, arguments=safe_args)
-
-            if hasattr(result, 'content') and result.content and len(result.content) > 0:
-                output = getattr(result.content[0], 'text', str(result.content[0]))
-                return f"Successfully executed {tool_name}. Result: {output}"
-            else:
-                return f"Successfully executed {tool_name}. No content returned."
+    import inspect
+    from contextlib import AsyncExitStack
+    
+    # Use HTTP transport rather than SSE to fix HTTP 405 error
+    async with AsyncExitStack() as stack:
+        sig = inspect.signature(http_client)
+        if "http_client" in sig.parameters:
+            client = await stack.enter_async_context(httpx.AsyncClient(headers=headers, timeout=httpx.Timeout(5.0, read=300.0)))
+            streams = await stack.enter_async_context(http_client(COCKROACH_MCP_URL, http_client=client))  # type: ignore
+        else:
+            streams = await stack.enter_async_context(http_client(COCKROACH_MCP_URL, headers=headers))  # type: ignore
+            
+        if len(streams) == 3:  # type: ignore
+            read_stream, write_stream, _ = streams  # type: ignore
+        else:
+            read_stream, write_stream = streams  # type: ignore
+            
+        session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
+        await session.initialize()
+        result = await session.call_tool(tool_name, arguments=safe_args)
+        
+        if hasattr(result, 'content') and result.content and len(result.content) > 0:
+            output = getattr(result.content[0], 'text', str(result.content[0]))
+            return f"Successfully executed {tool_name}. Result: {output}"
+        else:
+            return f"Successfully executed {tool_name}. No content returned."
 
 async def run_mcp_tool(tool_name: str, arguments: dict) -> str:
     safe_args = arguments or {}

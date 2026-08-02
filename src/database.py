@@ -42,7 +42,10 @@ async def init_db():
                     # Note: pgvector extension must be created by a database superuser out-of-band:
                     # CREATE EXTENSION IF NOT EXISTS vector;
 
-                    # Create incident_memory table
+                    # Drop old table to clear conflicting 1536-dimension embeddings
+                    await cur.execute("DROP TABLE IF EXISTS incident_memory;")
+                    
+                    # Create incident_memory table with 768 dimensions for Gemini
                     await cur.execute("""
                     CREATE TABLE IF NOT EXISTS incident_memory (
                         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -51,6 +54,12 @@ async def init_db():
                         resolution_steps TEXT,
                         embedding VECTOR(768)
                     );
+                    """)
+                    
+                    # CockroachDB Distributed Vector Indexing
+                    await cur.execute("""
+                    CREATE VECTOR INDEX IF NOT EXISTS incident_memory_embedding_idx 
+                    ON incident_memory (embedding);
                     """)
 
                     # Check if we need to seed
