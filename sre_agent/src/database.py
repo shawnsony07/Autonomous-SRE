@@ -9,6 +9,10 @@ load_dotenv()
 
 from src.llm_factory import get_embeddings
 
+def _format_vector(vector: list[float]) -> str:
+    """Formats a python list of floats into a pgvector string."""
+    return "[" + ",".join(map(str, vector)) + "]"
+
 def get_db_uri():
     db_url = os.getenv("COCKROACH_DATABASE_URL")
     if not db_url:

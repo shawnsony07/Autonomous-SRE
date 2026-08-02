@@ -52,7 +52,7 @@ async def aget_active_llm():
             # LiteLLM exposes an OpenAI-compatible endpoint. A dummy key is passed 
             # while LiteLLM handles the actual AWS Signature V4 authentication to Bedrock.
             llm = ChatOpenAI(
-                base_url="http://litellm:4000",
+                base_url=os.getenv("OPENAI_BASE_URL", "http://localhost:4000"),
                 api_key="sk-litellm-dummy-key",
                 model="agentic-sre-model",
                 temperature=0.0
