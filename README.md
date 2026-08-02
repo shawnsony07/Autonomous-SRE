@@ -10,22 +10,22 @@ When anomalies are detected, the agent uses LangGraph to orchestrate a reasoning
 ```mermaid
 flowchart TD
     %% Define Edge & Infrastructure
-    ESP32[Edge Device / ESP32] -- Telemetry & Anomalies --> MQTT[Mosquitto MQTT Broker]
+    ESP32["Edge Device / ESP32"] -- Telemetry & Anomalies --> MQTT["Mosquitto MQTT Broker"]
     
     %% SRE Agent Core
     subgraph SRE Agent
-        MQTT_Listener[MQTT Async Listener]
-        LangGraph[LangGraph State Workflow]
-        HITL[Human-In-The-Loop Gate]
+        MQTT_Listener["MQTT Async Listener"]
+        LangGraph["LangGraph State Workflow"]
+        HITL["Human-In-The-Loop Gate"]
     end
     
     MQTT -- Trigger Workflow --> MQTT_Listener
     MQTT_Listener --> LangGraph
     
     %% External Services
-    LiteLLM[LiteLLM Gateway]
-    CockroachDB[(CockroachDB Serverless)]
-    MCP[CockroachDB Managed MCP]
+    LiteLLM["LiteLLM Gateway"]
+    CockroachDB[("CockroachDB Serverless")]
+    MCP["CockroachDB Managed MCP"]
 
     %% Flow interactions
     LangGraph -- 1. Vector Search --> CockroachDB
@@ -33,15 +33,15 @@ flowchart TD
     LangGraph -- 3. Propose Action --> HITL
     
     HITL -- Approve --> MCP
-    MCP -- Execute Infrastructure Change --> System[Target Infrastructure / DB]
+    MCP -- Execute Infrastructure Change --> System["Target Infrastructure / DB"]
     
-    HITL -- Deny --> Abort((Abort))
+    HITL -- Deny --> Abort(("Abort"))
     
     %% LLM Tiers
     subgraph LLM Routing
-        LiteLLM --> FastTier[sre-fast-tier (Flash Lite)]
-        LiteLLM --> ComplexTier[sre-complex-tier (Flash)]
-        LiteLLM -.-> Ollama[Fallback Local Ollama]
+        LiteLLM --> FastTier["sre-fast-tier (Flash Lite)"]
+        LiteLLM --> ComplexTier["sre-complex-tier (Flash)"]
+        LiteLLM -.-> Ollama["Fallback Local Ollama"]
     end
 ```
 
