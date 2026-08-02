@@ -1,35 +1,25 @@
 model_list:
   # ==========================================
   # TIER 1: HIGH-FREQUENCY / FAST LOOP (sre-fast-tier)
+  # Using Flash Lite models for higher 15 RPM quota
   # ==========================================
-  - model_name: sre-fast-tier
-    litellm_params:
-      model: gemini/gemini-3-flash
-      api_key: os.environ/GEMINI_API_KEY
-      rpm: 30
-      tpm: 16000
-  - model_name: sre-fast-tier
-    litellm_params:
-      model: gemini/gemini-3.1-flash-lite
-      api_key: os.environ/GEMINI_API_KEY
-      rpm: 15
-      tpm: 250000
   - model_name: sre-fast-tier
     litellm_params:
       model: gemini/gemini-3.5-flash-lite
       api_key: os.environ/GEMINI_API_KEY
       rpm: 15
       tpm: 250000
+  - model_name: sre-fast-tier
+    litellm_params:
+      model: gemini/gemini-3.1-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 15
+      tpm: 250000
 
   # ==========================================
   # TIER 2: COMPLEX REASONING (sre-complex-tier)
+  # Using standard Flash models for deeper context (5 RPM)
   # ==========================================
-  - model_name: sre-complex-tier
-    litellm_params:
-      model: gemini/gemini-3.5-flash
-      api_key: os.environ/GEMINI_API_KEY
-      rpm: 5
-      tpm: 250000
   - model_name: sre-complex-tier
     litellm_params:
       model: gemini/gemini-3.6-flash
@@ -38,11 +28,11 @@ model_list:
       tpm: 250000
   - model_name: sre-complex-tier
     litellm_params:
-      model: gemini/gemma-4-31b-it
+      model: gemini/gemini-3.5-flash
       api_key: os.environ/GEMINI_API_KEY
       rpm: 5
       tpm: 250000
 
 router_settings:
-  routing_strategy: simple-shuffle # Best performance for production
+  routing_strategy: simple-shuffle
   enable_pre_call_checks: true
