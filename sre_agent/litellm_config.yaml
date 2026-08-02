@@ -1,7 +1,48 @@
 model_list:
-  - model_name: agentic-sre-model
+  # ==========================================
+  # TIER 1: HIGH-FREQUENCY / FAST LOOP (sre-fast-tier)
+  # ==========================================
+  - model_name: sre-fast-tier
     litellm_params:
-      model: bedrock/anthropic.claude-3-sonnet-20240229-v1:0
-      aws_access_key_id: os.environ/AWS_ACCESS_KEY_ID
-      aws_secret_access_key: os.environ/AWS_SECRET_ACCESS_KEY
-      aws_region_name: os.environ/AWS_REGION_NAME
+      model: gemini/gemma-4-31b
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 30
+      tpm: 16000
+  - model_name: sre-fast-tier
+    litellm_params:
+      model: gemini/gemini-3.1-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 15
+      tpm: 250000
+  - model_name: sre-fast-tier
+    litellm_params:
+      model: gemini/gemini-3.5-flash-lite
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 15
+      tpm: 250000
+
+  # ==========================================
+  # TIER 2: COMPLEX REASONING (sre-complex-tier)
+  # ==========================================
+  - model_name: sre-complex-tier
+    litellm_params:
+      model: gemini/gemini-3.5-flash
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 5
+      tpm: 250000
+  - model_name: sre-complex-tier
+    litellm_params:
+      model: gemini/gemini-3.6-flash
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 5
+      tpm: 250000
+  - model_name: sre-complex-tier
+    litellm_params:
+      model: gemini/gemini-3-flash
+      api_key: os.environ/GEMINI_API_KEY
+      rpm: 5
+      tpm: 250000
+
+router_settings:
+  routing_strategy: simple-shuffle # Best performance for production
+  enable_pre_call_checks: true

@@ -1,8 +1,6 @@
 import json
-import os
-import re
+import asyncio
 
-import psycopg_pool
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, Dict
 
@@ -10,7 +8,7 @@ from langchain_core.messages import SystemMessage, HumanMessage
 from langgraph.graph import StateGraph, START, END
 
 from src.database import get_db_uri, _format_vector
-from src.llm_factory import aget_active_llm, get_embeddings
+from src.llm_factory import aget_active_llm, get_embeddings, LLM_CALL_TIMEOUT
 from src.tools import run_mcp_tool
 from src.prompts import DETECT_INGEST_PROMPT, REASON_PLAN_SYSTEM_PROMPT, REASON_PLAN_HUMAN_PROMPT
 
@@ -32,11 +30,14 @@ async def detect_ingest_node(state: AgentState) -> AgentState:
     print(f"\n[Node: Detect/Ingest] Processing incident {state.incident_id}")
     cleaned_logs = state.raw_logs.strip()
 
-    llm = await aget_active_llm()
+    llm = await aget_active_llm(tier="sre-fast-tier")
     prompt = DETECT_INGEST_PROMPT.format(cleaned_logs=cleaned_logs)
 
     try:
-        response = await llm.ainvoke(prompt)
+        response = await asyncio.wait_for(
+            llm.ainvoke(prompt),
+            timeout=LLM_CALL_TIMEOUT,
+        )
         raw_content = response.content.strip()
         content = {}
         end = raw_content.rfind('}')
@@ -52,6 +53,9 @@ async def detect_ingest_node(state: AgentState) -> AgentState:
         alert_type = content.get("alert_type", "Unknown Edge Anomaly")
         if not alert_type and "Unknown Edge Anomaly" not in content:
             alert_type = "Unknown Edge Anomaly"
+    except asyncio.TimeoutError:
+        print(f" -> LLM Detection timed out after {LLM_CALL_TIMEOUT}s")
+        alert_type = "Unknown Edge Anomaly"
     except Exception as e:
         print(f" -> LLM Detection failed: {e}")
         alert_type = "Unknown Edge Anomaly"
@@ -99,7 +103,7 @@ async def retrieve_memory_node(state: AgentState) -> AgentState:
 
 async def reason_plan_node(state: AgentState) -> AgentState:
     print(f"\n[Node: Reason_Plan] Planning remediation for '{state.alert_type}'")
-    llm = await aget_active_llm()
+    llm = await aget_active_llm(tier="sre-complex-tier")
 
     sys_msg = SystemMessage(content=REASON_PLAN_SYSTEM_PROMPT)
     hum_msg = HumanMessage(content=REASON_PLAN_HUMAN_PROMPT.format(
@@ -109,8 +113,12 @@ async def reason_plan_node(state: AgentState) -> AgentState:
     ))
 
     try:
-        print(" -> Invoking Ollama LLM (this may take a few minutes for a 12B parameter model... please wait)")
-        response = await llm.ainvoke([sys_msg, hum_msg])
+        print(" -> Invoking LiteLLM complex-tier for root-cause analysis (may take up to "
+              f"{int(LLM_CALL_TIMEOUT)}s)…")
+        response = await asyncio.wait_for(
+            llm.ainvoke([sys_msg, hum_msg]),
+            timeout=LLM_CALL_TIMEOUT,
+        )
 
         raw_content = response.content.strip()
         content = {}
@@ -128,6 +136,9 @@ async def reason_plan_node(state: AgentState) -> AgentState:
         action_args = content.get("arguments", {})
         print(f" -> Plan created: {proposed_action} with args {action_args}")
         return {"proposed_action": proposed_action, "action_args": action_args}
+    except asyncio.TimeoutError:
+        print(f" -> LLM Planning timed out after {LLM_CALL_TIMEOUT}s")
+        return {"execution_status": "failed_planning"}
     except Exception as e:
         print(f" -> LLM Planning failed: {e}")
         return {"execution_status": "failed_planning"}

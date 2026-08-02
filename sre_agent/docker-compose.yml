@@ -6,9 +6,7 @@ services:
     volumes:
       - ./litellm_config.yaml:/app/litellm_config.yaml
     environment:
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - AWS_REGION_NAME=${AWS_REGION_NAME:-ap-south-2}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
     command: [ "--config", "/app/litellm_config.yaml", "--port", "4000" ]
 
   mosquitto:

@@ -1,5 +1,4 @@
 import os
-import sys
 import uuid
 import asyncio
 import psycopg_pool
@@ -52,10 +51,10 @@ async def init_db():
                     if count == 0:
                         print("Seeding incident_memory with mock historical incidents...")
 
-                        from src.llm_factory import aget_active_llm
-                        await aget_active_llm()
-
-                        embedder = get_embeddings()
+                        # OllamaEmbeddings construction is synchronous (may probe the
+                        # server at build time). Wrap in to_thread to keep the event
+                        # loop free during the seeding phase.
+                        embedder = await asyncio.to_thread(get_embeddings)
 
                         incidents = [
                             (str(uuid.uuid4()), "Thermal Runaway", "ESP32 thermal sensor reports temperature exceeding 85C for 60 seconds.", "Triggered active cooling fans and throttled CPU clock to 80MHz.", await embedder.aembed_query("ESP32 thermal sensor reports temperature exceeding 85C for 60 seconds.")),

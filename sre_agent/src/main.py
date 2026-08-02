@@ -115,23 +115,28 @@ async def run_graph(graph, payload) -> None:
                 else:
                     print("Approve execution? [y/N]: ", end="", flush=True)
                     if sys.platform == 'win32':
-                        import msvcrt, time
-                        start_time = time.time()
+                        import msvcrt
                         response = "n"
-                        while time.time() - start_time < 30:
-                            if msvcrt.kbhit():
-                                char = msvcrt.getche()
+                        deadline = asyncio.get_event_loop().time() + 30
+                        while asyncio.get_event_loop().time() < deadline:
+                            # msvcrt.kbhit() is non-blocking; sleep briefly between polls
+                            if await asyncio.to_thread(msvcrt.kbhit):
+                                char = await asyncio.to_thread(msvcrt.getche)
                                 if char in (b'\r', b'\n'):
                                     print()
                                     break
                                 response = char.decode('utf-8', 'ignore')
                             await asyncio.sleep(0.1)
                     else:
-                        import select
-                        r, _, _ = select.select([sys.stdin], [], [], 30.0)
-                        if r:
-                            response = sys.stdin.readline().strip()
-                        else:
+                        # CRITICAL FIX: select.select() is a blocking syscall that
+                        # stalls the event loop. Use asyncio.to_thread() instead.
+                        try:
+                            response = await asyncio.wait_for(
+                                asyncio.to_thread(sys.stdin.readline),
+                                timeout=30.0,
+                            )
+                            response = response.strip()
+                        except asyncio.TimeoutError:
                             print("\n -> Timeout waiting for operator approval.")
                             response = "n"
                 
@@ -173,9 +178,12 @@ def on_message(client, userdata, msg):
 async def run_mqtt_listener():
     print("Initializing MQTT Listener for ESP32 Telematics...")
     
-    # Pre-warm LLM checking logic at startup, within the main event loop
+    # Pre-warm LLM — bounded timeout so a slow LiteLLM gateway at boot does
+    # NOT stall the MQTT listener from starting.
     try:
-        await aget_active_llm()
+        await asyncio.wait_for(aget_active_llm(), timeout=30.0)
+    except asyncio.TimeoutError:
+        print("LLM warm-up timed out after 30s. Continuing; will retry on first incident.")
     except Exception as e:
         print(f"Could not lock in an LLM at startup: {e}")
         print("Continuing anyway; will retry during incident processing.")
@@ -191,8 +199,9 @@ async def run_mqtt_listener():
     client.on_connect = on_connect
     client.on_message = on_message
     
-    client.connect("localhost", 1883, 60)
-    # Remove the imperative client.subscribe() call here
+    # CRITICAL: client.connect() is a synchronous blocking TCP call. Offload to
+    # a thread so the event loop is not stalled during the broker handshake.
+    await asyncio.to_thread(client.connect, "localhost", 1883, 60)
     client.loop_start()
     print("Listening for live hardware anomalies...")
     try:
