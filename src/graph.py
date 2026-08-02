@@ -72,8 +72,9 @@ async def retrieve_memory_node(state: AgentState) -> AgentState:
 
     hist = ""
     try:
-        from src.main import _global_pool
-        async with _global_pool.connection() as conn:
+        from src.database import get_pool
+        pool = get_pool()
+        async with pool.connection() as conn:
             async with conn.cursor() as cur:
                 # Use CTE to avoid sending the vector parameter twice
                 await cur.execute("""

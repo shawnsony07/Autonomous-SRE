@@ -19,7 +19,6 @@ from src.llm_factory import aget_active_llm
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-_global_pool = None
 _compiled_graph = None
 _init_lock = None
 _cli_lock = None
@@ -49,7 +48,7 @@ def _log_future_error(f):
 
 
 async def init_global_graph():
-    global _global_pool, _compiled_graph
+    global _compiled_graph
     if _compiled_graph:
         return _compiled_graph
 
@@ -60,11 +59,6 @@ async def init_global_graph():
             return _compiled_graph
 
         graph_builder = build_graph()
-        db_uri = get_db_uri()
-
-        # CRITICAL FIX: Pass open=False so we can manually await _global_pool.open() without crashing
-        _global_pool = psycopg_pool.AsyncConnectionPool(db_uri, open=False)
-        await _global_pool.open()
         
         # Switched to MemorySaver to bypass the CockroachDB jsonb_each_text error
         checkpointer = MemorySaver()
@@ -210,9 +204,13 @@ async def run_mqtt_listener():
         print("Shutting down gracefully...")
         client.loop_stop()
         client.disconnect()
-        if _global_pool:
-            await _global_pool.close()
+        try:
+            from src.database import get_pool
+            pool = get_pool()
+            await pool.close()
             print("Database connection pool closed.")
+        except RuntimeError:
+            pass
 
 
 if __name__ == "__main__":

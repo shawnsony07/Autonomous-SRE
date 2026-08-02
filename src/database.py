@@ -8,6 +8,14 @@ load_dotenv()
 
 from src.llm_factory import get_embeddings
 
+_global_pool = None
+
+def get_pool():
+    global _global_pool
+    if _global_pool is None:
+        raise RuntimeError("Database connection pool has not been initialized.")
+    return _global_pool
+
 def _format_vector(vector: list[float]) -> str:
     """Formats a python list of floats into a pgvector string."""
     return "[" + ",".join(map(str, vector)) + "]"
@@ -21,12 +29,14 @@ def get_db_uri():
     return db_url
 
 async def init_db():
+    global _global_pool
     db_uri = get_db_uri()
     print("Initializing CockroachDB tables...")
 
     try:
-        async with psycopg_pool.AsyncConnectionPool(db_uri) as pool:
-            async with pool.connection() as conn:
+        _global_pool = psycopg_pool.AsyncConnectionPool(db_uri, open=False)
+        await _global_pool.open()
+        async with _global_pool.connection() as conn:
                 async with conn.cursor() as cur:
 
                     # Note: pgvector extension must be created by a database superuser out-of-band:
