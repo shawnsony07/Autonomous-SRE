@@ -11,12 +11,12 @@ When anomalies are detected, the agent uses LangGraph to orchestrate a reasoning
 ```mermaid
 flowchart TD
     %% Styling
-    classDef edge fill:#e1f5fe,stroke:#0288d1,stroke-width:2px,color:#000
-    classDef agent fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef service fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000
-    classDef danger fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000
-    classDef db fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000
-    classDef llm fill:#ede7f6,stroke:#512da8,stroke-width:2px,color:#000
+    classDef edge fill:#0288d1,stroke:#01579b,stroke-width:3px,color:#fff,font-weight:bold
+    classDef agent fill:#7b1fa2,stroke:#4a0072,stroke-width:3px,color:#fff,font-weight:bold
+    classDef service fill:#2e7d32,stroke:#1b5e20,stroke-width:3px,color:#fff,font-weight:bold
+    classDef danger fill:#c62828,stroke:#7f0000,stroke-width:3px,color:#fff,font-weight:bold
+    classDef db fill:#e65100,stroke:#bf360c,stroke-width:3px,color:#fff,font-weight:bold
+    classDef llm fill:#4527a0,stroke:#1a0072,stroke-width:3px,color:#fff,font-weight:bold
 
     %% Define Edge & Infrastructure
     ESP32["Edge Device / ESP32"]:::edge -- Telemetry & Anomalies --> MQTT["Mosquitto MQTT Broker"]:::service
@@ -61,9 +61,9 @@ The heart of the SRE Agent is a deterministic state machine built with LangGraph
 
 ```mermaid
 stateDiagram-v2
-    classDef process fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000
-    classDef danger fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000
-    classDef success fill:#e8f5e9,stroke:#388e3c,stroke-width:2px,color:#000
+    classDef process fill:#1565c0,stroke:#003c8f,stroke-width:3px,color:#fff,font-weight:bold
+    classDef danger fill:#b71c1c,stroke:#7f0000,stroke-width:3px,color:#fff,font-weight:bold
+    classDef success fill:#1b5e20,stroke:#003300,stroke-width:3px,color:#fff,font-weight:bold
 
     [*] --> Detect_Ingest
     Detect_Ingest --> Retrieve_Memory: Parse Telemetry
