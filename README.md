@@ -1,5 +1,6 @@
-# Autonomous SRE Agent
+# EdgeOps Agent: Cognitive SRE with Distributed Vector Memory
 
+![EdgeOps Agent Logo](logo.png)
 ## Overview
 The Autonomous SRE Agent is a next-generation reliability system designed to autonomously ingest, diagnose, and remediate hardware and software anomalies in real time. It leverages a tiered Large Language Model (LLM) architecture via LiteLLM, persistent vector memory backed by CockroachDB Serverless, and direct edge-device interaction through MQTT. 
 
