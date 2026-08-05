@@ -10,23 +10,31 @@ When anomalies are detected, the agent uses LangGraph to orchestrate a reasoning
 
 ```mermaid
 flowchart TD
+    %% Styling
+    classDef edge fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef agent fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef service fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+    classDef danger fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    classDef db fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef llm fill:#ede7f6,stroke:#512da8,stroke-width:2px
+
     %% Define Edge & Infrastructure
-    ESP32["Edge Device / ESP32"] -- Telemetry & Anomalies --> MQTT["Mosquitto MQTT Broker"]
+    ESP32["Edge Device / ESP32"]:::edge -- Telemetry & Anomalies --> MQTT["Mosquitto MQTT Broker"]:::service
     
     %% SRE Agent Core
     subgraph SRE Agent
-        MQTT_Listener["MQTT Async Listener"]
-        LangGraph["LangGraph State Workflow"]
-        HITL["Human-In-The-Loop Gate"]
+        MQTT_Listener["MQTT Async Listener"]:::agent
+        LangGraph["LangGraph State Workflow"]:::agent
+        HITL["Human-In-The-Loop Gate"]:::danger
     end
     
     MQTT -- Trigger Workflow --> MQTT_Listener
     MQTT_Listener --> LangGraph
     
     %% External Services
-    LiteLLM["LiteLLM Gateway"]
-    CockroachDB[("CockroachDB Serverless")]
-    MCP["CockroachDB Managed MCP"]
+    LiteLLM["LiteLLM Gateway"]:::llm
+    CockroachDB[("CockroachDB Serverless")]:::db
+    MCP["CockroachDB Managed MCP"]:::service
 
     %% Flow interactions
     LangGraph -- 1. Vector Search --> CockroachDB
@@ -34,15 +42,15 @@ flowchart TD
     LangGraph -- 3. Propose Action --> HITL
     
     HITL -- Approve --> MCP
-    MCP -- Execute Infrastructure Change --> System["Target Infrastructure / DB"]
+    MCP -- Execute Infrastructure Change --> System["Target Infrastructure / DB"]:::db
     
-    HITL -- Deny --> Abort(("Abort"))
+    HITL -- Deny --> Abort(("Abort")):::danger
     
     %% LLM Tiers
     subgraph LLM Routing
-        LiteLLM --> FastTier["sre-fast-tier (Flash Lite)"]
-        LiteLLM --> ComplexTier["sre-complex-tier (Flash)"]
-        LiteLLM -.-> Ollama["Fallback Local Ollama"]
+        LiteLLM --> FastTier["sre-fast-tier (Flash Lite)"]:::llm
+        LiteLLM --> ComplexTier["sre-complex-tier (Flash)"]:::llm
+        LiteLLM -.-> Ollama["Fallback Local Ollama"]:::llm
     end
 ```
 
@@ -53,6 +61,10 @@ The heart of the SRE Agent is a deterministic state machine built with LangGraph
 
 ```mermaid
 stateDiagram-v2
+    classDef process fill:#e3f2fd,stroke:#1976d2,stroke-width:2px
+    classDef danger fill:#ffebee,stroke:#d32f2f,stroke-width:2px
+    classDef success fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
+
     [*] --> Detect_Ingest
     Detect_Ingest --> Retrieve_Memory: Parse Telemetry
     Retrieve_Memory --> Reason_Plan: Fetch Vector History
@@ -68,6 +80,11 @@ stateDiagram-v2
     
     Execute_Skill --> Reason_Plan: Tool Failed (Retry < 3)
     Execute_Skill --> [*]: Resolved / Aborted
+
+    class Detect_Ingest, Retrieve_Memory, Reason_Plan process
+    class Execute_Skill process
+    class HITL_Gate, Abort danger
+    class ExecTool success
 ```
 
 ### 2. Tiered LLM Routing (LiteLLM)
