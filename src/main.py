@@ -16,6 +16,7 @@ from src.database import init_db, get_db_uri
 from src.graph import build_graph, AgentState
 from src.tools import validate_mcp_config
 from src.llm_factory import aget_active_llm
+from src.metrics import INCIDENT_COUNTER
 
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -149,8 +150,17 @@ async def run_graph(graph, payload) -> None:
             async for event in graph.astream(None, config=config):
                 pass
 
-    print(f"\n--- Workflow Complete for Incident {initial_state.incident_id} ---")
+    state_dict = await graph.aget_state(config)
+    final_status = state_dict.values.get("execution_status", "unknown")
+    alert_type = state_dict.values.get("alert_type", "Unknown Edge Anomaly")
+    
+    # Record metrics
+    INCIDENT_COUNTER.labels(
+        alert_type=alert_type,
+        resolution_status=final_status
+    ).inc()
 
+    print(f"\n--- Workflow Complete for Incident {initial_state.incident_id} ---")
 
 def on_message(client, userdata, msg):
     try:
@@ -215,12 +225,18 @@ async def run_mqtt_listener():
             pass
 
 
+def start_metrics_server():
+    from prometheus_client import start_http_server
+    print("Starting Prometheus metrics server on port 8000...")
+    start_http_server(8000)
+
 if __name__ == "__main__":
     print("Initializing Autonomous SRE Agent...")
     
     async def main():
         await init_db()
         validate_mcp_config()
+        start_metrics_server()
         await run_mqtt_listener()
         
     asyncio.run(main())

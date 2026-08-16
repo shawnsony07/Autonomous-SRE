@@ -1,5 +1,6 @@
 import json
 import asyncio
+import time
 
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, Dict
@@ -11,6 +12,7 @@ from src.database import get_db_uri, _format_vector
 from src.llm_factory import aget_active_llm, get_embeddings, LLM_CALL_TIMEOUT
 from src.tools import run_mcp_tool
 from src.prompts import DETECT_INGEST_PROMPT, REASON_PLAN_SYSTEM_PROMPT, REASON_PLAN_HUMAN_PROMPT
+from src.metrics import LLM_LATENCY_HISTOGRAM
 
 # Define strict AgentState schema using Pydantic
 class AgentState(BaseModel):
@@ -116,10 +118,13 @@ async def reason_plan_node(state: AgentState) -> AgentState:
     try:
         print(" -> Invoking LiteLLM complex-tier for root-cause analysis (may take up to "
               f"{int(LLM_CALL_TIMEOUT)}s)…")
+        start_time = time.time()
         response = await asyncio.wait_for(
             llm.ainvoke([sys_msg, hum_msg]),
             timeout=LLM_CALL_TIMEOUT,
         )
+        duration = time.time() - start_time
+        LLM_LATENCY_HISTOGRAM.observe(duration)
 
         raw_content = response.content.strip()
         content = {}
