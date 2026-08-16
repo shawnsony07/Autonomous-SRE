@@ -36,20 +36,19 @@ def get_ollama_base_url():
 
 
 def get_embeddings():
-    """Return a cached OllamaEmbeddings instance.
+    """Return a cached GoogleGenerativeAIEmbeddings instance (text-embedding-004, 768-dim).
 
-    OllamaEmbeddings construction is synchronous and potentially blocking
-    (it may probe the server at construction time). We guard it with a
-    threading lock so that only one thread can initialise it, and keep it
-    as a module-level singleton so the blocking init only occurs once.
+    Gemini embeddings are used instead of Ollama so the agent can run on any
+    host without a local GPU / Ollama installation.  The model output dimension
+    is 768, which matches the incident_memory VECTOR(768) column exactly.
     """
     global _cached_embeddings
     with _emb_lock:
         if _cached_embeddings is None:
-            from langchain_ollama import OllamaEmbeddings
-            _cached_embeddings = OllamaEmbeddings(
-                model="nomic-embed-text",
-                base_url=get_ollama_base_url(),
+            from langchain_google_genai import GoogleGenerativeAIEmbeddings
+            _cached_embeddings = GoogleGenerativeAIEmbeddings(
+                model="models/text-embedding-004",
+                google_api_key=os.getenv("GEMINI_API_KEY"),
             )
         return _cached_embeddings
 
