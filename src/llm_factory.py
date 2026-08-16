@@ -28,29 +28,39 @@ def reset_llm_state():
     _cached_embeddings = None
 
 
-# Gemini API key read once at module level
-_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+# Direct REST endpoint — v1beta is the published, stable path for text-embedding-004.
+# Using httpx (already in requirements) avoids all SDK version/routing issues.
+_EMBED_URL = (
+    "https://generativelanguage.googleapis.com"
+    "/v1beta/models/text-embedding-004:embedContent"
+)
 
 
 class _GeminiEmbedder:
-    """Thin embeddings wrapper using the google-genai SDK pinned to v1 API.
+    """Calls the Gemini embedContent REST API directly via httpx.
 
-    google-genai is already installed as a transitive dep of langchain-google-genai.
-    Forcing api_version='v1' bypasses the v1beta routing that causes 404
-    for text-embedding-004.
+    No google-genai / langchain-google-genai SDK involved — just a plain HTTPS
+    POST to the published v1beta endpoint.  text-embedding-004 returns 768-dim
+    vectors which match the incident_memory VECTOR(768) column exactly.
     """
 
-    def __init__(self, api_key: str, model: str = "text-embedding-004"):
-        from google import genai
-        self._client = genai.Client(
-            api_key=api_key,
-            http_options={"api_version": "v1"},
-        )
-        self._model = model
+    def __init__(self, api_key: str):
+        import httpx
+        self._params = {"key": api_key}
+        self._http = httpx.Client(timeout=30.0)
 
     def _embed(self, text: str) -> list:
-        result = self._client.models.embed_content(model=self._model, contents=text)
-        return result.embeddings[0].values
+        import httpx
+        response = self._http.post(
+            _EMBED_URL,
+            params=self._params,
+            json={
+                "model": "models/text-embedding-004",
+                "content": {"parts": [{"text": text}]},
+            },
+        )
+        response.raise_for_status()
+        return response.json()["embedding"]["values"]
 
     def embed_query(self, text: str) -> list:
         return self._embed(text)
@@ -68,8 +78,7 @@ class _GeminiEmbedder:
 def get_embeddings():
     """Return a cached _GeminiEmbedder (text-embedding-004, 768-dim).
 
-    Uses google-generativeai directly (v1 API) — no langchain-google-genai
-    wrapper, no dependency conflicts, no v1beta routing issues.
+    Pure httpx REST call — zero SDK version constraints.
     """
     global _cached_embeddings
     with _emb_lock:
