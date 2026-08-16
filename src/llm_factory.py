@@ -28,28 +28,50 @@ def reset_llm_state():
     _cached_embeddings = None
 
 
-def get_ollama_base_url():
-    url = os.getenv("OLLAMA_BASE_URL")
-    if not url:
-        url = "http://localhost:11434"
-    return url
+# Gemini API key read once at module level
+_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+
+class _GeminiEmbedder:
+    """Thin LangChain-compatible wrapper around google-generativeai embeddings.
+
+    Uses the stable v1 REST endpoint via the ``google-generativeai`` package so
+    ``text-embedding-004`` (768-dim) is always reachable without any
+    google-generativeai>=0.8.0 version constraints.
+    """
+
+    def __init__(self, api_key: str, model: str = "models/text-embedding-004"):
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        self._model = model
+        self._genai = genai
+
+    def _embed(self, text: str) -> list:
+        return self._genai.embed_content(model=self._model, content=text)["embedding"]
+
+    def embed_query(self, text: str) -> list:
+        return self._embed(text)
+
+    def embed_documents(self, texts: list) -> list:
+        return [self._embed(t) for t in texts]
+
+    async def aembed_query(self, text: str) -> list:
+        return await asyncio.to_thread(self._embed, text)
+
+    async def aembed_documents(self, texts: list) -> list:
+        return await asyncio.to_thread(self.embed_documents, texts)
 
 
 def get_embeddings():
-    """Return a cached GoogleGenerativeAIEmbeddings instance (text-embedding-004, 768-dim).
+    """Return a cached _GeminiEmbedder (text-embedding-004, 768-dim).
 
-    Gemini embeddings are used instead of Ollama so the agent can run on any
-    host without a local GPU / Ollama installation.  The model output dimension
-    is 768, which matches the incident_memory VECTOR(768) column exactly.
+    Uses google-generativeai directly (v1 API) — no langchain-google-genai
+    wrapper, no dependency conflicts, no v1beta routing issues.
     """
     global _cached_embeddings
     with _emb_lock:
         if _cached_embeddings is None:
-            from langchain_google_genai import GoogleGenerativeAIEmbeddings
-            _cached_embeddings = GoogleGenerativeAIEmbeddings(
-                model="models/text-embedding-004",
-                google_api_key=os.getenv("GEMINI_API_KEY"),
-            )
+            _cached_embeddings = _GeminiEmbedder(api_key=_GEMINI_API_KEY)
         return _cached_embeddings
 
 
