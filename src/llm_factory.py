@@ -28,6 +28,9 @@ def reset_llm_state():
     _cached_embeddings = None
 
 
+# Gemini API key read once at module level
+_GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
 # Direct REST endpoint — v1beta is the published, stable path for text-embedding-004.
 # Using httpx (already in requirements) avoids all SDK version/routing issues.
 _EMBED_URL = (
