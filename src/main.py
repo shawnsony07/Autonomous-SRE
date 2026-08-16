@@ -194,7 +194,8 @@ async def run_mqtt_listener():
     
     # CRITICAL: client.connect() is a synchronous blocking TCP call. Offload to
     # a thread so the event loop is not stalled during the broker handshake.
-    await asyncio.to_thread(client.connect, "localhost", 1883, 60)
+    mqtt_host = os.getenv("MQTT_BROKER_HOST", "localhost")
+    await asyncio.to_thread(client.connect, mqtt_host, 1883, 60)
     client.loop_start()
     print("Listening for live hardware anomalies...")
     try:

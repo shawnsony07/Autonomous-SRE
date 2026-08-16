@@ -9,7 +9,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    network_mode: "host"
+    ports:
+      - "4000:4000"
     volumes:
       - ./litellm_config.yaml:/app/litellm_config.yaml
     environment:
@@ -18,7 +19,8 @@ services:
 
   mosquitto:
     image: eclipse-mosquitto:latest
-    network_mode: "host"
+    ports:
+      - "1883:1883"
     restart: unless-stopped
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
@@ -34,7 +36,6 @@ services:
       - 1.1.1.1
     image: python:3.11-slim
     working_dir: /app
-    network_mode: "host"
     restart: unless-stopped
     stdin_open: true
     tty: true
@@ -50,7 +51,8 @@ services:
       - PYTHONPATH=/app
       - COCKROACH_DATABASE_URL=${COCKROACH_DATABASE_URL}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://127.0.0.1:11434}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://127.0.0.1:4000}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://litellm:4000}
+      - MQTT_BROKER_HOST=mosquitto
       - COCKROACH_MCP_URL=${COCKROACH_MCP_URL}
       - COCKROACH_MCP_API_KEY=${COCKROACH_MCP_API_KEY}
       - MCP_CLUSTER_ID=${MCP_CLUSTER_ID}
