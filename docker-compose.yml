@@ -58,6 +58,7 @@ services:
       - COCKROACH_MCP_URL=${COCKROACH_MCP_URL}
       - COCKROACH_MCP_API_KEY=${COCKROACH_MCP_API_KEY}
       - MCP_CLUSTER_ID=${MCP_CLUSTER_ID}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
       - PYTHONUNBUFFERED=1
     command: >
       bash -c "pip install --no-cache-dir -r requirements.txt && python -m src.main"
