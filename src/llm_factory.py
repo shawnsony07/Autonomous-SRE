@@ -31,62 +31,24 @@ def reset_llm_state():
 # Gemini API key read once at module level
 _GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Direct REST endpoint — v1beta is the published, stable path for text-embedding-004.
-# Using httpx (already in requirements) avoids all SDK version/routing issues.
-_EMBED_URL = (
-    "https://generativelanguage.googleapis.com"
-    "/v1beta/models/text-embedding-004:embedContent"
-)
 
-
-class _GeminiEmbedder:
-    """Calls the Gemini embedContent REST API directly via httpx.
-
-    No google-genai / langchain-google-genai SDK involved — just a plain HTTPS
-    POST to the published v1beta endpoint.  text-embedding-004 returns 768-dim
-    vectors which match the incident_memory VECTOR(768) column exactly.
-    """
-
-    def __init__(self, api_key: str):
-        import httpx
-        self._params = {"key": api_key}
-        self._http = httpx.Client(timeout=30.0)
-
-    def _embed(self, text: str) -> list:
-        import httpx
-        response = self._http.post(
-            _EMBED_URL,
-            params=self._params,
-            json={
-                "model": "models/text-embedding-004",
-                "content": {"parts": [{"text": text}]},
-            },
-        )
-        response.raise_for_status()
-        return response.json()["embedding"]["values"]
-
-    def embed_query(self, text: str) -> list:
-        return self._embed(text)
-
-    def embed_documents(self, texts: list) -> list:
-        return [self._embed(t) for t in texts]
-
-    async def aembed_query(self, text: str) -> list:
-        return await asyncio.to_thread(self._embed, text)
-
-    async def aembed_documents(self, texts: list) -> list:
-        return await asyncio.to_thread(self.embed_documents, texts)
+def get_ollama_base_url():
+    url = os.getenv("OLLAMA_BASE_URL")
+    if not url:
+        url = "http://localhost:11434"
+    return url
 
 
 def get_embeddings():
-    """Return a cached _GeminiEmbedder (text-embedding-004, 768-dim).
-
-    Pure httpx REST call — zero SDK version constraints.
-    """
+    """Return a cached OllamaEmbeddings instance (nomic-embed-text, 768-dim)."""
     global _cached_embeddings
     with _emb_lock:
         if _cached_embeddings is None:
-            _cached_embeddings = _GeminiEmbedder(api_key=_GEMINI_API_KEY)
+            from langchain_ollama import OllamaEmbeddings
+            _cached_embeddings = OllamaEmbeddings(
+                model="nomic-embed-text",
+                base_url=get_ollama_base_url(),
+            )
         return _cached_embeddings
 
 

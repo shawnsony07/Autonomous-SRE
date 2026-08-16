@@ -1,6 +1,6 @@
 langgraph==1.2.11
 langchain-core==1.5.5
-langchain-google-genai==4.3.4
+langchain-ollama==1.1.0
 pydantic==2.13.4
 mcp==2.0.0
 python-dotenv==1.2.2
