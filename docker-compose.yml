@@ -9,8 +9,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-    ports:
-      - "4000:4000"
+    network_mode: "host"
     volumes:
       - ./litellm_config.yaml:/app/litellm_config.yaml
     environment:
