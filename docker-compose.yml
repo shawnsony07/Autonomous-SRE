@@ -44,15 +44,13 @@ services:
         condition: service_healthy
       litellm:
         condition: service_healthy
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - .:/app
       - ~/.postgresql/root.crt:/root/.postgresql/root.crt:ro
     environment:
       - PYTHONPATH=/app
       - COCKROACH_DATABASE_URL=${COCKROACH_DATABASE_URL}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://172.19.0.1:11434}
       - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://litellm:4000}
       - MQTT_BROKER_HOST=mosquitto
       - COCKROACH_MCP_URL=${COCKROACH_MCP_URL}
