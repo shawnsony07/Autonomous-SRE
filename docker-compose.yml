@@ -31,6 +31,7 @@ services:
       retries: 3
 
   sre_agent:
+    network_mode: "host"
     dns:
       - 8.8.8.8
       - 1.1.1.1
@@ -50,9 +51,9 @@ services:
     environment:
       - PYTHONPATH=/app
       - COCKROACH_DATABASE_URL=${COCKROACH_DATABASE_URL}
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://172.19.0.1:11434}
-      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://litellm:4000}
-      - MQTT_BROKER_HOST=mosquitto
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://127.0.0.1:11434}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://127.0.0.1:4000}
+      - MQTT_BROKER_HOST=127.0.0.1
       - COCKROACH_MCP_URL=${COCKROACH_MCP_URL}
       - COCKROACH_MCP_API_KEY=${COCKROACH_MCP_API_KEY}
       - MCP_CLUSTER_ID=${MCP_CLUSTER_ID}
