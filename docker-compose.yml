@@ -43,7 +43,7 @@ services:
       mosquitto:
         condition: service_healthy
       litellm:
-        condition: service_started
+        condition: service_healthy
     volumes:
       - .:/app
       - ~/.postgresql/root.crt:/root/.postgresql/root.crt:ro
