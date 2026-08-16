@@ -33,21 +33,24 @@ _GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 
 class _GeminiEmbedder:
-    """Thin LangChain-compatible wrapper around google-generativeai embeddings.
+    """Thin embeddings wrapper using the google-genai SDK pinned to v1 API.
 
-    Uses the stable v1 REST endpoint via the ``google-generativeai`` package so
-    ``text-embedding-004`` (768-dim) is always reachable without any
-    google-generativeai>=0.8.0 version constraints.
+    google-genai is already installed as a transitive dep of langchain-google-genai.
+    Forcing api_version='v1' bypasses the v1beta routing that causes 404
+    for text-embedding-004.
     """
 
-    def __init__(self, api_key: str, model: str = "models/text-embedding-004"):
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
+    def __init__(self, api_key: str, model: str = "text-embedding-004"):
+        from google import genai
+        self._client = genai.Client(
+            api_key=api_key,
+            http_options={"api_version": "v1"},
+        )
         self._model = model
-        self._genai = genai
 
     def _embed(self, text: str) -> list:
-        return self._genai.embed_content(model=self._model, content=text)["embedding"]
+        result = self._client.models.embed_content(model=self._model, contents=text)
+        return result.embeddings[0].values
 
     def embed_query(self, text: str) -> list:
         return self._embed(text)
