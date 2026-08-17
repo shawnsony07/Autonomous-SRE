@@ -129,6 +129,11 @@ async def run_mcp_tool(tool_name: str, arguments: dict) -> str:
 
     try:
         return await _execute_mcp_call(tool_name, safe_args, headers)
+    except ExceptionGroup as eg:
+        # Unwrap the TaskGroup exception to reveal the real HTTP error
+        error_msg = f"Failed to execute MCP tool {tool_name}. Inner Error: {eg.exceptions[0]}"
+        print(f"[TOOL] {error_msg}")
+        raise RuntimeError(error_msg)
     except Exception as e:
         error_msg = f"Failed to execute MCP tool {tool_name}. Error: {e}"
         print(f"[TOOL] {error_msg}")
