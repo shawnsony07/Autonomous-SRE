@@ -5,6 +5,7 @@ import os
 import uuid
 import traceback
 import paho.mqtt.client as mqtt
+import requests
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -18,6 +19,7 @@ from src.graph import build_graph, AgentState
 from src.tools import validate_mcp_config
 from src.llm_factory import aget_active_llm
 from src.metrics import INCIDENT_COUNTER
+from src.secrets_manager import load_secrets
 
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -107,6 +109,17 @@ async def run_graph(graph, payload) -> None:
                 print(f"Tool: {state.values.get('proposed_action')}")
                 print(f"Args: {action_args}")
                 
+                slack_webhook = os.getenv("SLACK_WEBHOOK_URL")
+                if slack_webhook:
+                    try:
+                        slack_msg = {
+                            "text": f"⚠️ *Autonomous SRE Agent HITL Alert* ⚠️\n*Incident ID:* {initial_state.incident_id}\n*Action:* `{state.values.get('proposed_action')}`\n*Args:* `{json.dumps(action_args)}`\n\nThe system is paused pending operator approval."
+                        }
+                        await asyncio.to_thread(requests.post, slack_webhook, json=slack_msg, timeout=5)
+                        print(" -> Slack notification sent.")
+                    except Exception as e:
+                        print(f" -> Failed to send Slack notification: {e}")
+
                 print(" -> WARNING: Execution paused for 30s pending operator approval.")
                 if not sys.stdin.isatty():
                     print(" -> Non-interactive environment detected. Auto-denying.")
@@ -212,7 +225,8 @@ async def run_mqtt_listener():
     # CRITICAL: client.connect() is a synchronous blocking TCP call. Offload to
     # a thread so the event loop is not stalled during the broker handshake.
     mqtt_host = os.getenv("MQTT_BROKER_HOST", "localhost")
-    await asyncio.to_thread(client.connect, mqtt_host, 1883, 60)
+    client.tls_set(ca_certs="certs/ca.crt")
+    await asyncio.to_thread(client.connect, mqtt_host, 8883, 60)
     client.loop_start()
     print("Listening for live hardware anomalies...")
     try:
@@ -240,6 +254,7 @@ if __name__ == "__main__":
     print("Initializing Autonomous SRE Agent...")
     
     async def main():
+        load_secrets()
         await init_db()
         validate_mcp_config()
         start_metrics_server()

@@ -44,7 +44,8 @@ def get_mqtt_publisher() -> mqtt.Client:
     with _mqtt_lock:
         if _mqtt_publisher is None:
             _mqtt_publisher = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)  # type: ignore
-            _mqtt_publisher.connect("localhost", 1883, 60)
+            _mqtt_publisher.tls_set(ca_certs="certs/ca.crt")
+            _mqtt_publisher.connect("localhost", 8883, 60)
             _mqtt_publisher.loop_start()
         return _mqtt_publisher
 

@@ -20,10 +20,11 @@ services:
   mosquitto:
     image: eclipse-mosquitto:latest
     ports:
-      - "1883:1883"
+      - "8883:8883"
     restart: unless-stopped
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./certs:/mosquitto/certs:ro
     healthcheck:
       test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -W 3 || exit 1"]
       interval: 30s
