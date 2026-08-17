@@ -9,7 +9,7 @@ _llm_lock = None
 _emb_lock = __import__('threading').Lock()
 
 # Timeout (seconds) for the gateway health-probe at LLM init time.
-_LLM_INIT_TIMEOUT = float(os.getenv("LLM_INIT_TIMEOUT_S", "30"))
+_LLM_INIT_TIMEOUT = float(os.getenv("LLM_INIT_TIMEOUT_S", "120"))
 
 # Timeout (seconds) applied to every individual LLM call in the pipeline.
 LLM_CALL_TIMEOUT = float(os.getenv("LLM_CALL_TIMEOUT_S", "120"))
