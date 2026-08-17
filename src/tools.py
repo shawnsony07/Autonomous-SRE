@@ -5,14 +5,7 @@ import paho.mqtt.client as mqtt
 import httpx
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 
-# Dynamically import HTTP client across MCP SDK versions
-try:
-    from mcp.client.http import http_client  # type: ignore
-except ImportError:
-    try:
-        from mcp.client.streamable_http import streamablehttp_client as http_client  # type: ignore
-    except ImportError:
-        from mcp.client.streamable_http import streamable_http_client as http_client
+from mcp.client.sse import sse_client
 
 COCKROACH_MCP_URL = os.environ.get("COCKROACH_MCP_URL", "https://mock-mcp-server.cockroachlabs.cloud/sse")
 COCKROACH_MCP_API_KEY = os.environ.get("COCKROACH_MCP_API_KEY", "")
@@ -82,22 +75,17 @@ async def publish_edge_command(command: str) -> str:
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10), retry=retry_if_exception_type((ConnectionError, asyncio.TimeoutError, httpx.RequestError)))
 async def _execute_mcp_call(tool_name: str, safe_args: dict, headers: dict) -> str:
-    import inspect
     from contextlib import AsyncExitStack
     
-    # Use HTTP transport rather than SSE to fix HTTP 405 error
+    # Use SSE transport for /sse endpoints
     async with AsyncExitStack() as stack:
-        sig = inspect.signature(http_client)
-        if "http_client" in sig.parameters:
-            client = await stack.enter_async_context(httpx.AsyncClient(headers=headers, timeout=httpx.Timeout(5.0, read=300.0)))
-            streams = await stack.enter_async_context(http_client(COCKROACH_MCP_URL, http_client=client))  # type: ignore
+        streams = await stack.enter_async_context(sse_client(COCKROACH_MCP_URL, headers=headers))
+        
+        # sse_client returns a tuple, we just need the read and write streams
+        if len(streams) == 3:  # Handle variation in MCP versions
+            read_stream, write_stream, _ = streams
         else:
-            streams = await stack.enter_async_context(http_client(COCKROACH_MCP_URL, headers=headers))  # type: ignore
-            
-        if len(streams) == 3:  # type: ignore
-            read_stream, write_stream, _ = streams  # type: ignore
-        else:
-            read_stream, write_stream = streams  # type: ignore
+            read_stream, write_stream = streams[:2]
             
         session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
         await session.initialize()
