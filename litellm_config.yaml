@@ -33,6 +33,18 @@ model_list:
       rpm: 5
       tpm: 250000
 
+  # ==========================================
+  # TIER 3: FALLBACK (local-fallback)
+  # Using local Ollama model in case of cloud API failure
+  # ==========================================
+  - model_name: local-fallback
+    litellm_params:
+      model: ollama/llama3.2:1b
+      api_base: os.environ/OLLAMA_BASE_URL
+
 router_settings:
   routing_strategy: simple-shuffle
   enable_pre_call_checks: true
+  allowed_fails: 2
+  cooldown_time: 60
+  fallbacks: [{"sre-complex-tier": ["local-fallback"]}]

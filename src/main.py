@@ -12,7 +12,8 @@ load_dotenv()
 import psycopg_pool
 from langgraph.checkpoint.memory import MemorySaver
 
-from src.database import init_db, get_db_uri
+from functools import partial
+from src.database import init_db, get_db_uri, route_to_dlq
 from src.graph import build_graph, AgentState
 from src.tools import validate_mcp_config
 from src.llm_factory import aget_active_llm
@@ -37,14 +38,16 @@ def get_cli_lock():
         _cli_lock = asyncio.Lock()
     return _cli_lock
 
-def _log_future_error(f):
-    """Callback for run_coroutine_threadsafe futures — logs exceptions without crashing the MQTT thread."""
+def _log_future_error(payload, loop, f):
+    """Callback for run_coroutine_threadsafe futures — logs exceptions and routes to DLQ if task fails."""
     try:
         exc = f.exception()
         if exc:
             print(f"ASYNC ERROR in incident processing: {exc}")
+            asyncio.run_coroutine_threadsafe(route_to_dlq(payload, str(exc)), loop)
     except asyncio.CancelledError:
         print("ASYNC ERROR: Incident processing was cancelled.")
+        asyncio.run_coroutine_threadsafe(route_to_dlq(payload, "Incident processing was cancelled"), loop)
     except Exception as e:
         print(f"ASYNC ERROR in callback: {e}")
 
@@ -74,8 +77,9 @@ async def process_incident(payload: dict) -> None:
         graph = await init_global_graph()
         await run_graph(graph, payload)
     except Exception as e:
-        print(f"CRITICAL ERROR in workflow execution: {e}")
+        print(f"CRITICAL ERROR: Workflow crashed. Routing payload to DLQ.")
         traceback.print_exc()
+        await route_to_dlq(payload, str(e))
 
 
 async def run_graph(graph, payload) -> None:
@@ -173,7 +177,9 @@ def on_message(client, userdata, msg):
 
         loop = userdata['loop']
         future = asyncio.run_coroutine_threadsafe(process_incident(payload), loop)
-        future.add_done_callback(_log_future_error)
+        
+        callback = partial(_log_future_error, payload, loop)
+        future.add_done_callback(callback)
     except Exception as e:
         print(f"Error parsing ESP32 telemetry: {e}")
         traceback.print_exc()

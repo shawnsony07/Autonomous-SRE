@@ -61,6 +61,16 @@ async def init_db():
                     CREATE VECTOR INDEX IF NOT EXISTS incident_memory_embedding_idx 
                     ON incident_memory (embedding);
                     """)
+                    
+                    # Create DLQ table
+                    await cur.execute("""
+                    CREATE TABLE IF NOT EXISTS dead_letter_queue (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        payload JSONB,
+                        error_reason TEXT,
+                        created_at TIMESTAMP DEFAULT current_timestamp()
+                    );
+                    """)
 
                     # Check if we need to seed
                     await cur.execute("SELECT COUNT(*) FROM incident_memory;")
@@ -94,6 +104,25 @@ async def init_db():
     except Exception as e:
         print(f"CRITICAL ERROR during database initialization: {e}")
         raise RuntimeError(f"Database initialization failed: {e}") from e
+
+async def route_to_dlq(payload: dict, error_reason: str):
+    import json
+    global _global_pool
+    if _global_pool is None:
+        print("Error: Database pool not initialized when attempting to route to DLQ.")
+        return
+    
+    try:
+        async with _global_pool.connection() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "INSERT INTO dead_letter_queue (payload, error_reason) VALUES (%s, %s)",
+                    (json.dumps(payload), error_reason)
+                )
+            await conn.commit()
+        print("Successfully routed failed payload to Dead Letter Queue.")
+    except Exception as e:
+        print(f"FATAL ERROR: Failed to write to Dead Letter Queue: {e}")
 
 if __name__ == "__main__":
     asyncio.run(init_db())
