@@ -1,0 +1,43 @@
+flowchart TD
+    %% Styling
+    classDef edge fill:#0288d1,stroke:#01579b,stroke-width:3px,color:#fff,font-weight:bold
+    classDef agent fill:#7b1fa2,stroke:#4a0072,stroke-width:3px,color:#fff,font-weight:bold
+    classDef service fill:#2e7d32,stroke:#1b5e20,stroke-width:3px,color:#fff,font-weight:bold
+    classDef danger fill:#c62828,stroke:#7f0000,stroke-width:3px,color:#fff,font-weight:bold
+    classDef db fill:#e65100,stroke:#bf360c,stroke-width:3px,color:#fff,font-weight:bold
+    classDef llm fill:#4527a0,stroke:#1a0072,stroke-width:3px,color:#fff,font-weight:bold
+
+    %% Define Edge & Infrastructure
+    ESP32["Edge Device / ESP32"]:::edge -- Telemetry & Anomalies --> MQTT["Mosquitto MQTT Broker"]:::service
+    
+    %% SRE Agent Core
+    subgraph SRE Agent
+        MQTT_Listener["MQTT Async Listener"]:::agent
+        LangGraph["LangGraph State Workflow"]:::agent
+        HITL["Slack Socket Mode / Terminal HITL"]:::danger
+    end
+    
+    MQTT -- Trigger Workflow --> MQTT_Listener
+    MQTT_Listener --> LangGraph
+    
+    %% External Services
+    LiteLLM["LiteLLM Gateway Circuit Breaker"]:::llm
+    CockroachDB[("CockroachDB Serverless")]:::db
+    MCP["CockroachDB Managed MCP"]:::service
+
+    %% Flow interactions
+    LangGraph -- 1. Vector Search --> CockroachDB
+    LangGraph -- 2. Anomaly Detection & Reasoning --> LiteLLM
+    LangGraph -- 3. Propose Action --> HITL
+    
+    HITL -- Approve --> MCP
+    MCP -- Execute Infrastructure Change --> System["Target Infrastructure / DB"]:::db
+    
+    HITL -- Deny --> Abort(("Abort")):::danger
+    
+    %% LLM Tiers
+    subgraph LLM Routing
+        LiteLLM --> FastTier["sre-fast-tier (Flash Lite)"]:::llm
+        LiteLLM --> ComplexTier["sre-complex-tier (Flash)"]:::llm
+        LiteLLM -.-> Gemini["Fallback Gemini via REST"]:::llm
+    end
