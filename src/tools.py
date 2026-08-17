@@ -120,6 +120,19 @@ async def run_mcp_tool(tool_name: str, arguments: dict) -> str:
         except Exception as e:
             return f"Failed to publish edge command. Error: {e}"
 
+    if tool_name == "execute_query":
+        try:
+            from src.database import get_pool
+            pool = get_pool()
+            query = safe_args.get("query", "")
+            async with pool.connection() as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(query)
+                await conn.commit()
+            return f"Successfully executed query: {query}"
+        except Exception as e:
+            return f"Failed to execute local query. Error: {e}"
+
     print(f"[TOOL] Executing MCP tool: {tool_name} with args: {safe_args}")
 
     headers = {
