@@ -6,7 +6,7 @@ from botocore.exceptions import ClientError
 def load_secrets():
     """Fetches secrets from AWS Secrets Manager and injects them into os.environ."""
     secret_name = "sre-agent-secrets"
-    region_name = "us-east-1"
+    region_name = os.getenv("AWS_REGION", "ap-south-2")
 
     # We do not crash if AWS credentials aren't found locally, 
     # to support local dev without IAM roles, though prod expects it.
