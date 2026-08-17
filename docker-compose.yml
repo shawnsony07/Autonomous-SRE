@@ -8,7 +8,7 @@ services:
       test: ["CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:4000/health/liveliness\")' || exit 1"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 30
     ports:
       - "4000:4000"
     volumes:
@@ -26,10 +26,10 @@ services:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
       - ./certs:/mosquitto/certs:ro
     healthcheck:
-      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -W 3 || exit 1"]
-      interval: 30s
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -W 3 -p 8883 --cafile /mosquitto/certs/ca.crt || exit 1"]
+      interval: 10s
       timeout: 5s
-      retries: 3
+      retries: 5
 
   sre_agent:
     network_mode: "host"
