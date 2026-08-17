@@ -79,12 +79,15 @@ async def retrieve_memory_node(state: AgentState) -> AgentState:
         async with pool.connection() as conn:
             async with conn.cursor() as cur:
                 # Use CTE to avoid sending the vector parameter twice
+                # Apply temporal decay: penalty of 0.2 to distance for records older than 30 days
                 await cur.execute("""
                     WITH q AS (SELECT %s::vector AS v)
                     SELECT error_log, resolution_steps
                     FROM incident_memory, q
                     WHERE embedding <=> q.v < 0.25
-                    ORDER BY embedding <=> q.v
+                    ORDER BY 
+                        (embedding <=> q.v) + CASE WHEN created_at < current_timestamp() - INTERVAL '30 days' THEN 0.2 ELSE 0.0 END ASC,
+                        created_at DESC
                     LIMIT 1
                 """, (query_vector,))
 

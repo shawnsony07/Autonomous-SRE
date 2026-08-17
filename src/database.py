@@ -52,9 +52,18 @@ async def init_db():
                         alert_type TEXT,
                         error_log TEXT,
                         resolution_steps TEXT,
-                        embedding VECTOR(768)
+                        embedding VECTOR(768),
+                        created_at TIMESTAMP DEFAULT current_timestamp()
                     );
                     """)
+                    
+                    # Graceful migration for existing tables
+                    try:
+                        await cur.execute("ALTER TABLE incident_memory ADD COLUMN created_at TIMESTAMP DEFAULT current_timestamp();")
+                    except Exception as alt_err:
+                        # Ignore if column already exists
+                        pass
+
                     
                     # CockroachDB Distributed Vector Indexing
                     await cur.execute("""
