@@ -5,7 +5,6 @@ import os
 import uuid
 import traceback
 import paho.mqtt.client as mqtt
-import requests
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -20,6 +19,7 @@ from src.tools import validate_mcp_config
 from src.llm_factory import aget_active_llm
 from src.metrics import INCIDENT_COUNTER
 from src.secrets_manager import load_secrets
+from src.slack_bot import start_slack_bot, send_hitl_alert, hitl_futures
 
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -109,48 +109,72 @@ async def run_graph(graph, payload) -> None:
                 print(f"Tool: {state.values.get('proposed_action')}")
                 print(f"Args: {action_args}")
                 
-                slack_webhook = os.getenv("SLACK_WEBHOOK_URL")
-                if slack_webhook:
-                    try:
-                        slack_msg = {
-                            "text": f"⚠️ *Autonomous SRE Agent HITL Alert* ⚠️\n*Incident ID:* {initial_state.incident_id}\n*Action:* `{state.values.get('proposed_action')}`\n*Args:* `{json.dumps(action_args)}`\n\nThe system is paused pending operator approval."
-                        }
-                        await asyncio.to_thread(requests.post, slack_webhook, json=slack_msg, timeout=5)
-                        print(" -> Slack notification sent.")
-                    except Exception as e:
-                        print(f" -> Failed to send Slack notification: {e}")
-
-                print(" -> WARNING: Execution paused for 30s pending operator approval.")
-                if not sys.stdin.isatty():
-                    print(" -> Non-interactive environment detected. Auto-denying.")
-                    response = "n"
-                else:
+                # Create a future to listen for Slack responses
+                slack_future = asyncio.get_running_loop().create_future()
+                hitl_futures[initial_state.incident_id] = slack_future
+                
+                # Dispatch the interactive alert via the Slack Bot
+                await send_hitl_alert(initial_state.incident_id, state.values.get('proposed_action'), action_args)
+                
+                print(" -> WARNING: Execution paused for 120s pending operator approval (Slack or Terminal).")
+                
+                response = None
+                
+                # Task 1: Terminal Input (Interactive)
+                async def wait_for_terminal():
+                    if not sys.stdin.isatty():
+                        print(" -> Non-interactive environment detected. Terminal input disabled.")
+                        # Wait forever if non-interactive, so Slack can take over
+                        await asyncio.sleep(86400)
+                        return "n"
+                    
                     print("Approve execution? [y/N]: ", end="", flush=True)
                     if sys.platform == 'win32':
                         import msvcrt
-                        response = "n"
-                        deadline = asyncio.get_event_loop().time() + 30
-                        while asyncio.get_event_loop().time() < deadline:
-                            # msvcrt.kbhit() is non-blocking; sleep briefly between polls
+                        while True:
                             if await asyncio.to_thread(msvcrt.kbhit):
                                 char = await asyncio.to_thread(msvcrt.getche)
                                 if char in (b'\r', b'\n'):
                                     print()
-                                    break
-                                response = char.decode('utf-8', 'ignore')
+                                    return "n"
+                                return char.decode('utf-8', 'ignore')
                             await asyncio.sleep(0.1)
                     else:
-                        # CRITICAL FIX: select.select() is a blocking syscall that
-                        # stalls the event loop. Use asyncio.to_thread() instead.
-                        try:
-                            response = await asyncio.wait_for(
-                                asyncio.to_thread(sys.stdin.readline),
-                                timeout=30.0,
-                            )
-                            response = response.strip()
-                        except asyncio.TimeoutError:
-                            print("\n -> Timeout waiting for operator approval.")
-                            response = "n"
+                        # Use asyncio.to_thread for sys.stdin.readline
+                        ans = await asyncio.to_thread(sys.stdin.readline)
+                        return ans.strip()
+
+                terminal_task = asyncio.create_task(wait_for_terminal())
+                slack_task = asyncio.create_task(slack_future)
+                
+                try:
+                    # Race the terminal input vs the Slack response vs the 120s timeout
+                    done, pending = await asyncio.wait(
+                        [terminal_task, slack_task],
+                        timeout=120.0,
+                        return_when=asyncio.FIRST_COMPLETED
+                    )
+                    
+                    if not done:
+                        print("\n -> Timeout (120s) waiting for operator approval.")
+                        response = "n"
+                    else:
+                        first_completed = done.pop()
+                        response = first_completed.result()
+                        if first_completed == slack_task:
+                            print(f"\n -> Approval received from Slack: {response}")
+                        else:
+                            print(f"\n -> Approval received from Terminal: {response}")
+                            
+                except Exception as e:
+                    print(f"\n -> Error during HITL wait: {e}")
+                    response = "n"
+                finally:
+                    # Cleanup
+                    terminal_task.cancel()
+                    slack_task.cancel()
+                    if initial_state.incident_id in hitl_futures:
+                        del hitl_futures[initial_state.incident_id]
                 
             if response.strip().lower() in ('y', 'yes'):
                 print(" -> Execution approved by operator.")
@@ -255,6 +279,10 @@ if __name__ == "__main__":
     
     async def main():
         load_secrets()
+        
+        # Start Slack Socket Mode Bot in the background
+        asyncio.create_task(start_slack_bot())
+        
         await init_db()
         validate_mcp_config()
         start_metrics_server()
