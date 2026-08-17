@@ -145,12 +145,11 @@ async def run_graph(graph, payload) -> None:
                         return ans.strip()
 
                 terminal_task = asyncio.create_task(wait_for_terminal())
-                slack_task = asyncio.create_task(slack_future)
                 
                 try:
                     # Race the terminal input vs the Slack response vs the 120s timeout
                     done, pending = await asyncio.wait(
-                        [terminal_task, slack_task],
+                        [terminal_task, slack_future],
                         timeout=120.0,
                         return_when=asyncio.FIRST_COMPLETED
                     )
@@ -161,7 +160,7 @@ async def run_graph(graph, payload) -> None:
                     else:
                         first_completed = done.pop()
                         response = first_completed.result()
-                        if first_completed == slack_task:
+                        if first_completed == slack_future:
                             print(f"\n -> Approval received from Slack: {response}")
                         else:
                             print(f"\n -> Approval received from Terminal: {response}")
@@ -172,7 +171,6 @@ async def run_graph(graph, payload) -> None:
                 finally:
                     # Cleanup
                     terminal_task.cancel()
-                    slack_task.cancel()
                     if initial_state.incident_id in hitl_futures:
                         del hitl_futures[initial_state.incident_id]
                 
