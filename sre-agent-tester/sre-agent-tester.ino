@@ -6,9 +6,9 @@
 // ==========================================
 // Network Configuration
 // ==========================================
-const char* ssid        = "airtel";
-const char* password    = "shawn123";
-const char* mqtt_server = "98.130.53.27"; 
+const char* ssid        = "YOUR_WIFI_SSID";
+const char* password    = "YOUR_WIFI_PASSWORD";
+const char* mqtt_server = "YOUR_MQTT_SERVER_IP"; 
 const int   mqtt_port   = 8883; // 8883 is the encrypted MQTTS port
 
 // Topics matching src/main.py and src/tools.py
