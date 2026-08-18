@@ -255,6 +255,9 @@ class AgentState(BaseModel):
 
 ### 1. Hardware Edge Node (ESP32)
 
+> [!NOTE]
+> **Mock Setup Disclaimer**: The ESP32 hardware interactions shown here (like turning on a fan) serve purely as a physical mock setup to demonstrate the agent's end-to-end capabilities. The Autonomous SRE Agent is designed to remediate complex, infrastructure-level database and cloud issues, not just local hardware controls!
+
 The physical edge hardware is a **Seeed Studio XIAO ESP32-S3** flashed with the firmware in `sre-agent-tester/sre-agent-tester.ino`. It uses three Arduino libraries:
 
 - **`WiFi.h`** — Station mode Wi-Fi connection
