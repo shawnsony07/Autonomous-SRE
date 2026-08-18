@@ -261,8 +261,12 @@ class AgentState(BaseModel):
 > An ESP32 can easily turn on its own fan locally, but this project builds a **cognitive engine for when local if/else statements fail**:
 > - **Treating the Root Cause**: A microcontroller only knows it's hot, not *why*. The SRE agent analyzes logs to deduce if the heat is from a software lockup—realizing that a `THROTTLE_CPU` command or rollback is the true fix, not just spinning a fan.
 > - **Fleet-Wide Context**: If 50 nodes get hot and turn on fans simultaneously, it could brown out the entire swarm. The central agent sees the global state and orchestrates staggered, safe responses.
-> - **Vector Memory**: Microcontrollers lack long-term memory. The agent leverages CockroachDB's vector search to learn from past mistakes (e.g., "The last three times we used the fan during this anomaly, the bus crashed, so let's try something else").
-> - **Human-In-The-Loop**: A local node shouldn't have the authority to execute highly destructive actions autonomously. The agent catches critical anomalies and securely asks for human permission before executing.
+> - **Vector Memory**: Microcontrollers lack long-term memory. The agent leverages CockroachDB's vector search to learn from past mistakes.
+> - **Human-In-The-Loop**: The agent catches critical anomalies and securely asks for human permission before executing.
+>
+> **Visualizing the Agent**: We integrated an OLED display into the ESP32 code so you can physically see the hardware state changes and watch exactly how the SRE agent is communicating with the edge in real time.
+>
+> **No Hardware? No Problem**: If you don't have an ESP32 or an OLED display lying around, you can still test the entire system! Simply use the included developer utility `scripts/mock_alerts.py` to inject synthetic anomalies directly into the Mosquitto broker and watch the agent resolve them.
 
 The physical edge hardware is a **Seeed Studio XIAO ESP32-S3** flashed with the firmware in `sre-agent-tester/sre-agent-tester.ino`. It uses three Arduino libraries:
 
