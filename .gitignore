@@ -27,3 +27,5 @@ pip-delete-this-directory.txt
 *.swp
 .DS_Store
 *.pem
+
+docs/final-demo.mp4
