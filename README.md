@@ -10,7 +10,7 @@
 ## Table of Contents
 - [Overview](#overview)
 - [Setup & Configuration](#setup--configuration)
-- [Hackathon Requirements](#hackathon-requirements)
+- [Technologies & Services Used](#technologies--services-used)
 - [System Architecture](#system-architecture)
 - [LangGraph Workflow (Deep Dive)](#langgraph-workflow-deep-dive)
 - [Core Technical Components](#core-technical-components)
@@ -165,8 +165,7 @@ docker compose exec sre_agent python scripts/mock_alerts.py
 
 ---
 
-## Hackathon Requirements
-This project was built for the **CockroachDB × AWS Hackathon - Build with Agentic Memory**.
+## Technologies & Services Used
 
 **CockroachDB Tools Used:**
 - **Distributed Vector Indexing**: pgvector is used to store 768-dimensional embeddings of all incident logs and resolutions in the incident_memory table. The agent performs Approximate Nearest Neighbor (ANN) semantic search with chronological decay to retrieve context for LLM reasoning.
