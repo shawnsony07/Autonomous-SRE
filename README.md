@@ -167,18 +167,18 @@ docker compose exec sre_agent python scripts/mock_alerts.py
 
 ## Technologies & Services Used
 
-### 🪳 Highlighted: CockroachDB
+### 🪳 CockroachDB
 - **Distributed Vector Indexing**: `pgvector` is used to store 768-dimensional embeddings of all incident logs and resolutions in the `incident_memory` table. The agent performs Approximate Nearest Neighbor (ANN) semantic search with chronological decay to retrieve context for LLM reasoning.
 - **CockroachDB Cloud Managed MCP Server**: The agent connects to the managed MCP server using `streamable_http` to execute `select_query`, `list_tables`, and `get_table_schema` for root cause analysis and DB operations without writing custom proxy tools.
 
-### ☁️ Highlighted: AWS Services
+### ☁️ AWS Services
 - **Amazon S3**: Used by the `prune_memory.py` cron job to archive stale semantic memory (older than 90 days) into JSONL files before pruning the database to maintain vector index performance.
 - **AWS Secrets Manager**: Integrated via `src/secrets_manager.py` to securely fetch and inject TLS certificates, LLM API keys, and MCP configuration into the runtime environment without static file mounts.
 - **Amazon EC2**: The Dockerized agent, MQTT broker, and Prometheus/Grafana stack are deployed and run on an AWS EC2 instance.
 
 ### 🧠 AI & Orchestration
 - **LangGraph & LangChain**: For defining the deterministic, cyclical state machine that drives the agentic reasoning and memory retrieval.
-- **Google Gemini**: Using `gemini-1.5-flash` and `gemini-1.5-flash-lite` via LiteLLM for tiered reasoning (fast classification vs. deep planning).
+- **Google Gemini**: Using `gemini-3.5-flash` and `gemini-3.5-flash-lite` via LiteLLM for tiered reasoning (fast classification vs. deep planning).
 - **LiteLLM**: Self-hosted LLM gateway for rate limiting, failovers, and unified OpenAI-compatible routing.
 
 ### 📡 IoT Edge & Messaging
