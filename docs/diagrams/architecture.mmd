@@ -1,43 +1,58 @@
-flowchart TD
+graph TD
+    subgraph "IoT Edge Layer"
+        ESP32["ESP32-S3 Microcontroller<br>(Sensors & Hardware Relays)"]
+    end
+
+    subgraph "AWS Cloud Infrastructure"
+        SM[("AWS Secrets Manager<br>(Secure Credentials)")]
+        S3[("Amazon S3 Bucket<br>(Stale Memory Archives)")]
+
+        subgraph "Amazon EC2 Instance (Docker Stack)"
+            Broker["Mosquitto Broker<br>(MQTTS over Port 8883)"]
+            Agent{"Autonomous SRE Agent<br>(LangGraph State Machine)"}
+            LiteLLM["LiteLLM Proxy<br>(Model Routing & Rate Limits)"]
+            Grafana["Prometheus & Grafana<br>(Metrics Dashboard)"]
+        end
+    end
+
+    subgraph "CockroachDB Cloud"
+        CRDB[("CockroachDB Serverless<br>(pgvector Memory & DLQ)")]
+        MCP["Managed MCP Server<br>(DB Tools & Schema Access)"]
+    end
+
+    subgraph "External Platforms"
+        Gemini(("Google Gemini API<br>(Flash & Flash-Lite)"))
+        Slack(("Slack Workspace<br>(HITL Approval Gate)"))
+        LangSmith(("LangSmith<br>(Agent Observability)"))
+    end
+
+    %% Edge to AWS
+    ESP32 <-->|1. Telemetry / Commands| Broker
+    Broker <-->|2. Internal Pub/Sub| Agent
+
+    %% AWS Services
+    SM -.->|Injects Keys at Boot| Agent
+    Agent -->|Archive Data via prune_memory.py| S3
+
+    %% Agent to CockroachDB
+    Agent <-->|3. pgvector ANN Search and SQL DDL| CRDB
+    Agent <-->|4. HTTP POST Tool Requests| MCP
+
+    %% Agent to AI & External
+    Agent <-->|5. LLM Chat Completions| LiteLLM
+    LiteLLM <-->|6. Tiered API Calls| Gemini
+    
+    Agent <-->|7. Socket Mode / Webhooks| Slack
+    Agent -->|8. Execution Traces| LangSmith
+    Agent -->|9. Scrape /metrics| Grafana
+
     %% Styling
-    classDef edge fill:#0288d1,stroke:#01579b,stroke-width:3px,color:#fff,font-weight:bold
-    classDef agent fill:#7b1fa2,stroke:#4a0072,stroke-width:3px,color:#fff,font-weight:bold
-    classDef service fill:#2e7d32,stroke:#1b5e20,stroke-width:3px,color:#fff,font-weight:bold
-    classDef danger fill:#c62828,stroke:#7f0000,stroke-width:3px,color:#fff,font-weight:bold
-    classDef db fill:#e65100,stroke:#bf360c,stroke-width:3px,color:#fff,font-weight:bold
-    classDef llm fill:#4527a0,stroke:#1a0072,stroke-width:3px,color:#fff,font-weight:bold
-
-    %% Define Edge & Infrastructure
-    ESP32["Edge Device / ESP32"]:::edge -- Telemetry & Anomalies --> MQTT["Mosquitto MQTT Broker"]:::service
+    classDef aws fill:#FF9900,stroke:#232F3E,stroke-width:2px,color:white;
+    classDef crdb fill:#6933FF,stroke:#000000,stroke-width:2px,color:white;
+    classDef agent fill:#000000,stroke:#00FF00,stroke-width:3px,color:white;
+    classDef edge fill:#00979D,stroke:#333333,stroke-width:2px,color:white;
     
-    %% SRE Agent Core
-    subgraph SRE Agent
-        MQTT_Listener["MQTT Async Listener"]:::agent
-        LangGraph["LangGraph State Workflow"]:::agent
-        HITL["Slack Socket Mode / Terminal HITL"]:::danger
-    end
-    
-    MQTT -- Trigger Workflow --> MQTT_Listener
-    MQTT_Listener --> LangGraph
-    
-    %% External Services
-    LiteLLM["LiteLLM Gateway Circuit Breaker"]:::llm
-    CockroachDB[("CockroachDB Serverless")]:::db
-    MCP["CockroachDB Managed MCP"]:::service
-
-    %% Flow interactions
-    LangGraph -- 1. Vector Search --> CockroachDB
-    LangGraph -- 2. Anomaly Detection & Reasoning --> LiteLLM
-    LangGraph -- 3. Propose Action --> HITL
-    
-    HITL -- Approve --> MCP
-    MCP -- Execute Infrastructure Change --> System["Target Infrastructure / DB"]:::db
-    
-    HITL -- Deny --> Abort(("Abort")):::danger
-    
-    %% LLM Tiers
-    subgraph LLM Routing
-        LiteLLM --> FastTier["sre-fast-tier (Flash Lite)"]:::llm
-        LiteLLM --> ComplexTier["sre-complex-tier (Flash)"]:::llm
-        LiteLLM -.-> Gemini["Fallback Gemini via REST"]:::llm
-    end
+    class SM,S3,Broker,Grafana,LiteLLM aws;
+    class CRDB,MCP crdb;
+    class Agent agent;
+    class ESP32 edge;
