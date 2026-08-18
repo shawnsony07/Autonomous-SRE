@@ -145,7 +145,7 @@ The firmware listens on `sre/edge/commands` and reacts to commands dispatched by
 
 **Live ESP32 execution log (captured from Serial Monitor):**
 
-![ESP32 Edge Node Execution Log](images/esp32-edge-node-execution-log.png)
+![ESP32 Edge Node Execution Log](docs/images/esp32-edge-node-execution-log.png)
 
 ---
 
@@ -225,19 +225,19 @@ CREATE VECTOR INDEX incident_memory_embedding_idx ON incident_memory (embedding)
 
 **CockroachDB live vector memory view:**
 
-![CockroachDB Live Vector Memory](images/cockroachdb-live-vector-memory.png)
+![CockroachDB Live Vector Memory](docs/images/cockroachdb-live-vector-memory.png)
 
 **Database tables overview:**
 
-![CockroachDB Database Tables Overview](images/cockroachdb-database-tables-overview.png)
+![CockroachDB Database Tables Overview](docs/images/cockroachdb-database-tables-overview.png)
 
 **Table schema detail:**
 
-![CockroachDB Vector Table Schema](images/cockroachdb-vector-table-schema.png)
+![CockroachDB Vector Table Schema](docs/images/cockroachdb-vector-table-schema.png)
 
 **Distributed vector index (CockroachDB native ANN):**
 
-![CockroachDB Distributed Vector Index](images/cockroachdb-distributed-vector-index.png)
+![CockroachDB Distributed Vector Index](docs/images/cockroachdb-distributed-vector-index.png)
 
 **ANN Query with Temporal Decay (`src/graph.py`):**
 ```sql
@@ -373,13 +373,13 @@ The first channel to respond wins. If neither responds within 120s, the action i
 
 This capture shows the agent's full startup sequence: secrets loaded from AWS Secrets Manager, CockroachDB initialized, vector memory seeded, Prometheus started, MQTT connected. Two incidents (`Thermal Runaway` / `Thermal Sensor Overheating`) arrive from the ESP32. The `Retrieve_Memory` node finds a historical match, `Reason_Plan` generates `publish_edge_command` with args `{command: FAN_ON}`, and `Execute_Skill` dispatches the MQTT command — workflow resolves without HITL because no `write_consent: True` flag was set.
 
-![Terminal Live Telemetry Workflow](images/terminal-live-telemetry-workflow.png)
+![Terminal Live Telemetry Workflow](docs/images/terminal-live-telemetry-workflow.png)
 
 **Slack Block Kit HITL notification — destructive action pending:**
 
 The `#sre-alerts` channel shows the bot posting an `⚠️ Autonomous SRE Agent HITL Alert ⚠️` Block Kit message for incident `TEST-DB-999`. The action is `execute_query` with args `{"query": "DROP TABLE old_metrics", "write_consent": true}`. The message displays two interactive buttons — **Approve** (green) and **Deny** (red) — and updates to `✅ Approved by @Shawn Sony` after the button is clicked. The channel history also shows multiple prior approvals from the same development session.
 
-![Slack Interactive Approval Gate](images/slack-interactive-approval-gate.png)
+![Slack Interactive Approval Gate](docs/images/slack-interactive-approval-gate.png)
 
 The Slack Bot (`src/slack_bot.py`) uses `slack_bolt` with **Socket Mode** — no public webhook endpoint is required. The bot establishes a persistent WebSocket connection to Slack's infrastructure and receives events in real time.
 
@@ -391,7 +391,7 @@ The Slack Bot (`src/slack_bot.py`) uses `slack_bolt` with **Socket Mode** — no
 
 This capture shows the complete HITL path for incident `TEST-DB-999`. The agent detects `Unrecoverable legacy table corruption`, fails to find a historical match (cold-start), plans `execute_query {DROP TABLE old_metrics, write_consent: True}`, and pauses. It dispatches the Slack Block Kit alert and races Slack against terminal. The log shows `-> Approval received from Slack: y` — the operator clicked Approve in Slack. `Execute_Skill` then runs the intercepted local DDL: `Successfully executed query: DROP TABLE old_metrics`. Workflow completes.
 
-![Terminal HITL Approval Workflow](images/terminal-hitl-approval-workflow.png)
+![Terminal HITL Approval Workflow](docs/images/terminal-hitl-approval-workflow.png)
 
 ---
 
@@ -432,11 +432,11 @@ The agent exposes a Prometheus metrics server on **port 8000** using `prometheus
 
 **Incident counter by type and status:**
 
-![Grafana Incident Counter Dashboard](images/grafana-incident-counter-dashboard.png)
+![Grafana Incident Counter Dashboard](docs/images/grafana-incident-counter-dashboard.png)
 
 **LLM inference latency histogram:**
 
-![Grafana LLM Latency Histogram](images/grafana-llm-latency-histogram.png)
+![Grafana LLM Latency Histogram](docs/images/grafana-llm-latency-histogram.png)
 
 **`prometheus.yml` scrape config:**
 ```yaml
@@ -456,43 +456,43 @@ Every LangGraph node execution, LLM invocation, and tool call is automatically t
 
 The top-level monitoring view for the `Autonomous-SRE-Agent` project. Trace Count shows bursts of activity on August 16–18. Trace Latency P99 spikes to ~120s during complex-tier LLM calls (matching `LLM_CALL_TIMEOUT_S=120`). Error rate spikes correspond to failed MCP transport attempts during the debugging phase.
 
-![LangSmith Observability Dashboard](images/langsmith-observability-dashboard.png)
+![LangSmith Observability Dashboard](docs/images/langsmith-observability-dashboard.png)
 
 **LangSmith Waterfall Trace — full incident resolution breakdown per node:**
 
 The Waterfall view for a single LangGraph thread turn (Turn 11, 15.90s total, 888 tokens). The trace is broken down into: `Detect_Ingest` → `ChatOpenAI` (7.28s, fast-tier classification), `Retrieve_Memory` (0.79s, vector ANN search), `Reason_Plan` → `ChatOpenAI` (5.37s + 2.46s, complex-tier reasoning). The right panel shows the `AgentState` mid-execution: `alert_type: Thermal Runaway`, `incident_id: xiao-esp32s3-node-01`, `proposed_action: publish_edge_command`, `action_args: {command: FAN_ON}`.
 
-![LangSmith LangGraph Waterfall Trace](images/langsmith-langgraph-waterfall-trace.png)
+![LangSmith LangGraph Waterfall Trace](docs/images/langsmith-langgraph-waterfall-trace.png)
 
 **LangSmith Run Types — per-node run counts, median latency, and error rate over time:**
 
 This view (LangSmith Feedback Scores / Run Types tab) shows depth-1 node-level statistics for all four LangGraph nodes: `Detect_Ingest`, `Execute_Skill`, `Reason_Plan`, `Retrieve_Memory`. The left chart shows run counts per node; the right shows **median latency** per node over time — `Reason_Plan` dominates at ~30s peaks, confirming the complex-tier LLM is the primary bottleneck. The error rate chart shows `Reason_Plan` had a ~25% error rate spike during LiteLLM debugging.
 
-![LangSmith Node Execution Stats](images/langsmith-node-execution-stats.png)
+![LangSmith Node Execution Stats](docs/images/langsmith-node-execution-stats.png)
 
 **LangSmith LLM Calls tab — LLM call count, P50/P99 latency, total cost, and output tokens over time:**
 
 This combined view covers the **LLM Calls** and **Cost & Tokens** sections. LLM Count shows bursts matching the Trace Count. LLM Latency P99 reaches ~120s (gateway timeout ceiling). Total Cost chart shows cumulative inference spend across the session. Output Tokens chart shows token consumption spikes during complex reasoning phases, peaking at ~6K tokens per incident during the database corruption scenario.
 
-![LangSmith LLM Latency Metrics](images/langsmith-llm-latency-metrics.png)
+![LangSmith LLM Latency Metrics](docs/images/langsmith-llm-latency-metrics.png)
 
 **LangSmith Cost & Tokens — dedicated token breakdown (output tokens, input tokens, per-trace percentiles):**
 
 The full Cost & Tokens tab showing **Output Tokens** (total and P50/P99 per trace), **Input Tokens** (total and P50/P99 per trace). Output token P99 reaches ~400 tokens/trace and Input P99 reaches ~5K tokens/trace, confirming that the system prompt with historical context injection in `Reason_Plan` is the dominant cost driver.
 
-![LangSmith Token Usage Metrics](images/langsmith-token-usage-metrics.png)
+![LangSmith Token Usage Metrics](docs/images/langsmith-token-usage-metrics.png)
 
 **LangSmith Turns view — per-turn AgentState inputs and outputs for a 14-turn thread:**
 
 This shows the Turns view for a complete LangGraph thread handling multiple back-to-back incidents (14 turns total). Each turn expands to show the full `AgentState` input and output at every node transition. Turn 13 shows `Retrieve_Memory` output: `historical_context: Similar Incident Log: ESP32 thermal sensor reports temperature exceeding 85C for 60 seconds. Resolution Used: Triggered active cooling fans...`. Turn 14 inputs `null` (the HITL resume stream), confirming the graph correctly resumed after the interrupt.
 
-![LangSmith Turns Execution View](images/langsmith-turns-execution-view.png)
+![LangSmith Turns Execution View](docs/images/langsmith-turns-execution-view.png)
 
 **LangSmith final resolved AgentState — execution_status: resolved, action: FAN_ON:**
 
 This is the full output state payload for the last turn of a completed incident resolution. The right panel (Details view, Turn 14) shows the final `AgentState` after `Execute_Skill` ran: `alert_type: Critical thermal sensor overheating`, `execution_status: resolved`, `historical_context: Similar Incident Log...`, `incident_id: xiao-esp32s3-node-01`, `proposed_action: publish_edge_command`, `action_args: {command: FAN_ON}`, `retry_count: 0`. This confirms the full end-to-end Thermal Runaway → FAN_ON remediation resolved in a single LangGraph thread with zero retries.
 
-![LangSmith Agent State Payload](images/langsmith-agent-state-payload.png)
+![LangSmith Agent State Payload](docs/images/langsmith-agent-state-payload.png)
 
 ---
 
@@ -536,30 +536,29 @@ Autonomous SRE/
 ├── LICENSE                      # MIT License
 │
 ├── docs/
-│   └── diagrams/
-│       ├── architecture.mmd     # Source: Mermaid architecture flowchart
-│       ├── architecture.png     # Rendered: System architecture diagram
-│       ├── langgraph.mmd        # Source: Mermaid LangGraph state machine
-│       └── langgraph.png        # Rendered: LangGraph execution flow
-│
-├── images/                      # Live screenshots and observability captures
-│   ├── cockroachdb-live-vector-memory.png
-│   ├── cockroachdb-database-tables-overview.png
-│   ├── cockroachdb-vector-table-schema.png
-│   ├── cockroachdb-distributed-vector-index.png
-│   ├── esp32-edge-node-execution-log.png
-│   ├── grafana-incident-counter-dashboard.png
-│   ├── grafana-llm-latency-histogram.png
-│   ├── langsmith-observability-dashboard.png
-│   ├── langsmith-langgraph-waterfall-trace.png
-│   ├── langsmith-node-execution-stats.png
-│   ├── langsmith-llm-latency-metrics.png
-│   ├── langsmith-token-usage-metrics.png
-│   ├── langsmith-turns-execution-view.png
-│   ├── langsmith-agent-state-payload.png
-│   ├── slack-interactive-approval-gate.png
-│   ├── terminal-hitl-approval-workflow.png
-│   └── terminal-live-telemetry-workflow.png
+│   ├── diagrams/                # Mermaid source (.mmd) + rendered PNGs
+│   │   ├── architecture.mmd     # Source: Mermaid architecture flowchart
+│   │   ├── architecture.png     # Rendered: System architecture diagram
+│   │   ├── langgraph.mmd        # Source: Mermaid LangGraph state machine
+│   │   └── langgraph.png        # Rendered: LangGraph execution flow
+│   └── images/                  # Live screenshots and observability captures
+│       ├── cockroachdb-live-vector-memory.png
+│       ├── cockroachdb-database-tables-overview.png
+│       ├── cockroachdb-vector-table-schema.png
+│       ├── cockroachdb-distributed-vector-index.png
+│       ├── esp32-edge-node-execution-log.png
+│       ├── grafana-incident-counter-dashboard.png
+│       ├── grafana-llm-latency-histogram.png
+│       ├── langsmith-observability-dashboard.png
+│       ├── langsmith-langgraph-waterfall-trace.png
+│       ├── langsmith-node-execution-stats.png
+│       ├── langsmith-llm-latency-metrics.png
+│       ├── langsmith-token-usage-metrics.png
+│       ├── langsmith-turns-execution-view.png
+│       ├── langsmith-agent-state-payload.png
+│       ├── slack-interactive-approval-gate.png
+│       ├── terminal-hitl-approval-workflow.png
+│       └── terminal-live-telemetry-workflow.png
 │
 ├── sre-agent-tester/
 │   └── sre-agent-tester.ino     # Arduino firmware for Seeed XIAO ESP32-S3
