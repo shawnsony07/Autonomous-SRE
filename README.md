@@ -256,7 +256,13 @@ class AgentState(BaseModel):
 ### 1. Hardware Edge Node (ESP32)
 
 > [!NOTE]
-> **Mock Setup Disclaimer**: The ESP32 hardware interactions shown here (like turning on a fan) serve purely as a physical proxy to demonstrate the agent's end-to-end event-driven capabilities in a tangible, easy-to-visualize way. In a real-world production environment, the Autonomous SRE Agent is designed to remediate complex infrastructure and hardware-level issues—such as cycling power on a degraded bare-metal server, failing over a misbehaving switch port, or automatically draining traffic from a thermal-throttling rack—rather than simply turning on a local cooling fan!
+> **Cognitive SRE vs. Deterministic Control (Mock Setup Disclaimer)**  
+> While the ESP32 hardware interactions shown here (like turning on a fan) serve as a tangible proxy to demonstrate the end-to-end communication pipeline, you might wonder: *why not just use a local `if (temp > 85) { turn_on_fan(); }` rule?*  
+> An ESP32 can easily turn on its own fan locally, but this project builds a **cognitive engine for when local if/else statements fail**:
+> - **Treating the Root Cause**: A microcontroller only knows it's hot, not *why*. The SRE agent analyzes logs to deduce if the heat is from a software lockup—realizing that a `THROTTLE_CPU` command or rollback is the true fix, not just spinning a fan.
+> - **Fleet-Wide Context**: If 50 nodes get hot and turn on fans simultaneously, it could brown out the entire swarm. The central agent sees the global state and orchestrates staggered, safe responses.
+> - **Vector Memory**: Microcontrollers lack long-term memory. The agent leverages CockroachDB's vector search to learn from past mistakes (e.g., "The last three times we used the fan during this anomaly, the bus crashed, so let's try something else").
+> - **Human-In-The-Loop**: A local node shouldn't have the authority to execute highly destructive actions autonomously. The agent catches critical anomalies and securely asks for human permission before executing.
 
 The physical edge hardware is a **Seeed Studio XIAO ESP32-S3** flashed with the firmware in `sre-agent-tester/sre-agent-tester.ino`. It uses three Arduino libraries:
 
