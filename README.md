@@ -9,6 +9,8 @@
 
 ## Table of Contents
 - [Overview](#overview)
+- [Setup & Configuration](#setup--configuration)
+- [Hackathon Requirements](#hackathon-requirements)
 - [System Architecture](#system-architecture)
 - [LangGraph Workflow (Deep Dive)](#langgraph-workflow-deep-dive)
 - [Core Technical Components](#core-technical-components)
@@ -24,7 +26,6 @@
   - [LangSmith Tracing](#10-langsmith-tracing)
 - [Database Schema](#database-schema)
 - [Codebase Structure](#codebase-structure)
-- [Setup & Configuration](#setup--configuration)
 - [Extending the Agent](#extending-the-agent)
 - [License](#license)
 
@@ -44,6 +45,137 @@ The **Autonomous SRE Agent** is a next-generation reliability system designed to
 The agent is fully containerized using **Docker Compose** and is deployable on any Linux server (tested on **AWS EC2 t3.micro**).
 
 ---
+
+## Setup & Configuration
+
+### Prerequisites
+- Docker & Docker Compose (tested on Docker 24+)
+- An **AWS EC2 instance** (t3.micro or larger, Amazon Linux 2 / Ubuntu 22.04)
+- A **CockroachDB Serverless** cluster with `pgvector` extension enabled
+- A **Google Gemini API Key**
+- A **Slack App** configured for Socket Mode with `SLACK_APP_TOKEN` and `SLACK_BOT_TOKEN`
+- (Optional) AWS credentials for Secrets Manager and S3 archiving
+
+### 1. Clone & Configure Environment
+```bash
+git clone https://github.com/shawnsony07/Autonomous-SRE.git
+cd Autonomous-SRE
+cp .env.template .env
+# Edit .env with your credentials
+```
+
+**Full `.env` reference:**
+```env
+# Database
+COCKROACH_DATABASE_URL="postgresql://user:pass@host:26257/defaultdb?sslmode=verify-full"
+
+# Cloud LLM
+OPENAI_BASE_URL="http://litellm:4000"
+GEMINI_API_KEY="your-gemini-api-key"
+
+# CockroachDB MCP
+COCKROACH_MCP_URL="https://cockroachlabs.cloud/mcp"
+COCKROACH_MCP_API_KEY="your-mcp-api-key"
+MCP_CLUSTER_ID="your-cluster-id"
+
+# LangSmith Tracing
+LANGCHAIN_TRACING_V2="true"
+LANGCHAIN_ENDPOINT="https://api.smith.langchain.com"
+LANGCHAIN_API_KEY="your-langsmith-key"
+LANGCHAIN_PROJECT="Autonomous-SRE-Agent"
+
+# Slack Integration (Socket Mode)
+SLACK_APP_TOKEN="xapp-1-..."
+SLACK_BOT_TOKEN="xoxb-..."
+SLACK_CHANNEL="#sre-alerts"
+
+# AWS
+AWS_REGION="ap-south-2"
+
+# MQTT Broker
+MQTT_BROKER_HOST="localhost"
+
+# Agent Tuning
+LLM_INIT_TIMEOUT_S="30"
+LLM_CALL_TIMEOUT_S="120"
+ALLOWED_EDGE_COMMANDS="reboot,reset,restart_service,clear_cache"
+
+# Continuous Memory Management
+MEMORY_RETENTION_DAYS="90"
+AWS_S3_ARCHIVE_BUCKET="your-s3-archive-bucket-name"
+```
+
+### 2. Generate MQTTS Certificates
+```bash
+bash scripts/generate_certs.sh
+# Generates: certs/ca.crt, certs/server.crt, certs/server.key
+```
+
+### 3. Launch the Full Stack
+```bash
+docker compose up -d --build
+```
+
+This starts 5 services:
+| Service | Port | Description |
+|---|---|---|
+| `sre_agent` | — | Core Python agent (host network) |
+| `mosquitto` | 8883 | MQTTS broker |
+| `litellm` | 4000 | LLM proxy gateway |
+| `prometheus` | 9090 | Metrics scraper |
+| `grafana` | 3000 | Dashboard UI |
+
+The agent will automatically:
+1. Load secrets from AWS Secrets Manager (if configured)
+2. Initialize the database schema and seed vector memory
+3. Start the Prometheus metrics server on port 8000
+4. Connect to Slack Socket Mode
+5. Connect to the Mosquitto broker and begin listening on `sre/edge/telemetry`
+
+### 4. Flash the ESP32 Edge Node
+
+Open `sre-agent-tester/sre-agent-tester.ino` in the **Arduino IDE**. Install the following libraries via Library Manager:
+- `PubSubClient` by Nick O'Leary
+- `ArduinoJson` by Benoit Blanchon
+- `WiFiClientSecure` (bundled with ESP32 board package)
+
+Update the credentials:
+```cpp
+const char* ssid        = "your-wifi-ssid";
+const char* password    = "your-wifi-password";
+const char* mqtt_server = "your-ec2-public-ip";
+```
+
+Select **Board: XIAO_ESP32S3**, then upload. Open the Serial Monitor at **115200 baud** to confirm MQTTS connection and telemetry publishing.
+
+### 5. Monitor & Verify
+```bash
+# Follow agent logs
+docker compose logs -f sre_agent
+
+# Check all services are healthy
+docker compose ps
+
+# Enumerate available MCP tools
+docker compose exec sre_agent python list_mcp_tools.py
+
+# Manually inject a test incident
+docker compose exec sre_agent python scripts/mock_alerts.py
+```
+
+---
+
+## Hackathon Requirements
+This project was built for the **CockroachDB × AWS Hackathon - Build with Agentic Memory**.
+
+**CockroachDB Tools Used:**
+- **Distributed Vector Indexing**: pgvector is used to store 768-dimensional embeddings of all incident logs and resolutions in the incident_memory table. The agent performs Approximate Nearest Neighbor (ANN) semantic search with chronological decay to retrieve context for LLM reasoning.
+- **CockroachDB Cloud Managed MCP Server**: The agent connects to the managed MCP server using streamable_http to execute select_query, list_tables, and get_table_schema for root cause analysis and DB operations without writing custom proxy tools.
+
+**AWS Services Used:**
+- **Amazon S3**: Used by the prune_memory.py cron job to archive stale semantic memory (older than 90 days) into JSONL files before pruning the database to maintain vector index performance.
+- **AWS Secrets Manager**: Integrated via src/secrets_manager.py to securely fetch and inject TLS certificates, LLM API keys, and MCP configuration into the runtime environment without static file mounts.
+- **Amazon EC2**: The Dockerized agent, MQTT broker, and Prometheus/Grafana stack are deployed and run on an AWS EC2 instance.
 
 ## System Architecture
 
@@ -580,125 +712,6 @@ Autonomous SRE/
     ├── metrics.py               # Prometheus Counter and Histogram definitions
     ├── secrets_manager.py       # AWS Secrets Manager integration for TLS/secret injection
     └── slack_bot.py             # Slack Socket Mode bot, Block Kit HITL alerts, future registry
-```
-
----
-
-## Setup & Configuration
-
-### Prerequisites
-- Docker & Docker Compose (tested on Docker 24+)
-- An **AWS EC2 instance** (t3.micro or larger, Amazon Linux 2 / Ubuntu 22.04)
-- A **CockroachDB Serverless** cluster with `pgvector` extension enabled
-- A **Google Gemini API Key**
-- A **Slack App** configured for Socket Mode with `SLACK_APP_TOKEN` and `SLACK_BOT_TOKEN`
-- (Optional) AWS credentials for Secrets Manager and S3 archiving
-
-### 1. Clone & Configure Environment
-```bash
-git clone https://github.com/shawnsony07/Autonomous-SRE.git
-cd Autonomous-SRE
-cp .env.template .env
-# Edit .env with your credentials
-```
-
-**Full `.env` reference:**
-```env
-# Database
-COCKROACH_DATABASE_URL="postgresql://user:pass@host:26257/defaultdb?sslmode=verify-full"
-
-# Cloud LLM
-OPENAI_BASE_URL="http://litellm:4000"
-GEMINI_API_KEY="your-gemini-api-key"
-
-# CockroachDB MCP
-COCKROACH_MCP_URL="https://cockroachlabs.cloud/mcp"
-COCKROACH_MCP_API_KEY="your-mcp-api-key"
-MCP_CLUSTER_ID="your-cluster-id"
-
-# LangSmith Tracing
-LANGCHAIN_TRACING_V2="true"
-LANGCHAIN_ENDPOINT="https://api.smith.langchain.com"
-LANGCHAIN_API_KEY="your-langsmith-key"
-LANGCHAIN_PROJECT="Autonomous-SRE-Agent"
-
-# Slack Integration (Socket Mode)
-SLACK_APP_TOKEN="xapp-1-..."
-SLACK_BOT_TOKEN="xoxb-..."
-SLACK_CHANNEL="#sre-alerts"
-
-# AWS
-AWS_REGION="ap-south-2"
-
-# MQTT Broker
-MQTT_BROKER_HOST="localhost"
-
-# Agent Tuning
-LLM_INIT_TIMEOUT_S="30"
-LLM_CALL_TIMEOUT_S="120"
-ALLOWED_EDGE_COMMANDS="reboot,reset,restart_service,clear_cache"
-
-# Continuous Memory Management
-MEMORY_RETENTION_DAYS="90"
-AWS_S3_ARCHIVE_BUCKET="your-s3-archive-bucket-name"
-```
-
-### 2. Generate MQTTS Certificates
-```bash
-bash scripts/generate_certs.sh
-# Generates: certs/ca.crt, certs/server.crt, certs/server.key
-```
-
-### 3. Launch the Full Stack
-```bash
-docker compose up -d --build
-```
-
-This starts 5 services:
-| Service | Port | Description |
-|---|---|---|
-| `sre_agent` | — | Core Python agent (host network) |
-| `mosquitto` | 8883 | MQTTS broker |
-| `litellm` | 4000 | LLM proxy gateway |
-| `prometheus` | 9090 | Metrics scraper |
-| `grafana` | 3000 | Dashboard UI |
-
-The agent will automatically:
-1. Load secrets from AWS Secrets Manager (if configured)
-2. Initialize the database schema and seed vector memory
-3. Start the Prometheus metrics server on port 8000
-4. Connect to Slack Socket Mode
-5. Connect to the Mosquitto broker and begin listening on `sre/edge/telemetry`
-
-### 4. Flash the ESP32 Edge Node
-
-Open `sre-agent-tester/sre-agent-tester.ino` in the **Arduino IDE**. Install the following libraries via Library Manager:
-- `PubSubClient` by Nick O'Leary
-- `ArduinoJson` by Benoit Blanchon
-- `WiFiClientSecure` (bundled with ESP32 board package)
-
-Update the credentials:
-```cpp
-const char* ssid        = "your-wifi-ssid";
-const char* password    = "your-wifi-password";
-const char* mqtt_server = "your-ec2-public-ip";
-```
-
-Select **Board: XIAO_ESP32S3**, then upload. Open the Serial Monitor at **115200 baud** to confirm MQTTS connection and telemetry publishing.
-
-### 5. Monitor & Verify
-```bash
-# Follow agent logs
-docker compose logs -f sre_agent
-
-# Check all services are healthy
-docker compose ps
-
-# Enumerate available MCP tools
-docker compose exec sre_agent python list_mcp_tools.py
-
-# Manually inject a test incident
-docker compose exec sre_agent python scripts/mock_alerts.py
 ```
 
 ---
