@@ -308,6 +308,16 @@ The firmware listens on `sre/edge/commands` and reacts to commands dispatched by
 
 ![ESP32 Edge Node Execution Log](docs/images/esp32-edge-node-execution-log.png)
 
+**Hardware Setup & OLED Visualizations:**
+
+We integrated an OLED display to provide real-time visual feedback of the SRE agent's commands physically executing on the edge node.
+
+![ESP32 Hardware Setup](docs/images/esp32-hardware-oled-setup.png)
+*Physical hardware setup with the Seeed Studio XIAO ESP32-S3 and 0.96" OLED display.*
+
+![OLED Agent Animation](docs/images/oled-animation.gif)
+*OLED animation showing the hardware reacting to a `FAN_ON` remediation command sent by the agent.*
+
 ---
 
 ### 2. MQTTS Secure Telemetry Ingestion
