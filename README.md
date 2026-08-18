@@ -8,6 +8,8 @@
 [![CockroachDB](https://img.shields.io/badge/CockroachDB-Serverless-orange.svg)](https://cockroachlabs.cloud)
 [![AWS](https://img.shields.io/badge/AWS-EC2%20|%20S3-FF9900.svg)](https://aws.amazon.com/)
 
+**📺 [Watch the Demo Video](https://youtu.be/JpVPppSWOFw)**
+
 ## Table of Contents
 - [Overview](#overview)
 - [Setup & Configuration](#setup--configuration)
@@ -316,7 +318,7 @@ We integrated an OLED display to provide real-time visual feedback of the SRE ag
 
 *Physical hardware setup with the Seeed Studio XIAO ESP32-S3 and 0.96" OLED display.*
 
-![OLED Agent Animation](docs/images/oled-animation.gif)
+![OLED Agent Animation](docs/oled-animation.gif)
 
 *OLED animation showing the hardware reacting to a `FAN_ON` remediation command sent by the agent.*
 
