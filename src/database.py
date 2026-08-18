@@ -57,14 +57,6 @@ async def init_db():
                     );
                     """)
                     
-                    # Graceful migration for existing tables
-                    try:
-                        await cur.execute("ALTER TABLE incident_memory ADD COLUMN created_at TIMESTAMP DEFAULT current_timestamp();")
-                    except Exception as alt_err:
-                        # Ignore if column already exists
-                        pass
-
-                    
                     # CockroachDB Distributed Vector Indexing
                     await cur.execute("""
                     CREATE VECTOR INDEX IF NOT EXISTS incident_memory_embedding_idx 
