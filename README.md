@@ -2,13 +2,13 @@
 
 ![EdgeOps Agent Logo](logo.png)
 
+**📺 [Watch the Demo Video](https://youtu.be/JpVPppSWOFw)**
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![LangGraph](https://img.shields.io/badge/LangGraph-1.2.11-purple.svg)](https://github.com/langchain-ai/langgraph)
 [![CockroachDB](https://img.shields.io/badge/CockroachDB-Serverless-orange.svg)](https://cockroachlabs.cloud)
 [![AWS](https://img.shields.io/badge/AWS-EC2%20|%20S3-FF9900.svg)](https://aws.amazon.com/)
-
-**📺 [Watch the Demo Video](https://youtu.be/JpVPppSWOFw)**
 
 ## Table of Contents
 - [Overview](#overview)
