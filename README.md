@@ -197,7 +197,7 @@ docker compose exec sre_agent python scripts/mock_alerts.py
 
 The diagram below illustrates the full data flow, from the ESP32 hardware edge all the way through vector memory retrieval, LLM reasoning, Slack approval, and MCP tool execution:
 
-![Architecture Diagram](https://github.com/shawnsony07/Autonomous-SRE/blob/e4992f9c8b1f830dbd3eccf69234f52fb415b6e2/docs/diagrams/architecture.png)
+![Architecture Diagram](https://github.com/shawnsony07/Autonomous-SRE/blob/0cbed7d1590e244c3557d4e7a51745016dcb8134/docs/diagrams/architecture.png)
 
 **Data Flow Summary:**
 1. The **ESP32 edge node** publishes a JSON telemetry payload over **MQTTS (port 8883)** to the Mosquitto broker running on the EC2 instance.
@@ -211,7 +211,7 @@ The diagram below illustrates the full data flow, from the ESP32 hardware edge a
 
 The LangGraph state machine is a deterministic, typed execution graph. It is compiled with `interrupt_before=["Execute_Skill"]` to forcibly pause and hand control to the HITL gate before any destructive operation.
 
-![LangGraph Workflow Diagram](https://github.com/shawnsony07/Autonomous-SRE/blob/e4992f9c8b1f830dbd3eccf69234f52fb415b6e2/docs/diagrams/langgraph.png)
+![LangGraph Workflow Diagram](https://github.com/shawnsony07/Autonomous-SRE/blob/0cbed7d1590e244c3557d4e7a51745016dcb8134/docs/diagrams/langgraph.png)
 
 ### State Schema (`AgentState`)
 ```python
